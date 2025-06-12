@@ -54,6 +54,7 @@ def main(args):
         raise ValueError(f"Invalid site {args.site}")
 
     if args.site not in args.save_sites:
+        print(args.save_sites)
         warnings.warn(
             f"Your local site {args.site} is not in save sites {args.save_sites}!", stacklevel=1
         )
