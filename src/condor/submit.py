@@ -18,6 +18,7 @@ from HH4b import run_utils
 t2_redirectors = {
     "lpc": "root://cmseos.fnal.gov//",
     "ucsd": "root://redirector.t2.ucsd.edu:1095//",
+    "cern": "root://eosuser.cern.ch//",
 }
 
 
@@ -36,21 +37,19 @@ def main(args):
     run_utils.check_branch(args.git_branch, args.git_user, args.allow_diff_local_repo)
     username = os.environ["USER"]
 
-    if args.site == "lpc":
+    if args.site == "lpc" or args.site == "cern":
         try:
             proxy = os.environ["X509_USER_PROXY"]
         except:
             print("No valid proxy. Exiting.")
             exit(1)
-    elif args.site == "ucsd":
+    elif args.site == "ucsd": 
         if username == "rkansal":
             proxy = "/home/users/rkansal/x509up_u31735"
         elif username == "dprimosc":
             proxy = "/tmp/x509up_u150012"  # "/home/users/dprimosc/x509up_u150012"
         elif username == "woodson":
             proxy = "/home/users/woodson/x509up_u31135"
-        elif username == "zichun":
-            proxy = "/home/users/zichun/.x509/x509up_u81974"
     else:
         raise ValueError(f"Invalid site {args.site}")
 
@@ -64,7 +63,11 @@ def main(args):
     tag = f"{args.tag}_{args.nano_version}_{args.region}"
 
     # make eos dir
-    pdir = Path(f"store/user/{username}/bbbb/{args.processor}/")
+    if args.site == "cern":
+        pdir = Path(f"eos/user/e/{username}/bbbb/{args.processor}/")
+    else: 
+        pdir = Path(f"store/user/{username}/bbbb/{args.processor}/")
+        
     outdir = pdir / tag
 
     # make local directory
@@ -157,7 +160,7 @@ def parse_args(parser):
         default="lpc",
         help="computing cluster we're running this on",
         type=str,
-        choices=["lpc", "ucsd"],
+        choices=["lpc", "ucsd", "cern"],
     )
     parser.add_argument(
         "--save-sites",
@@ -165,7 +168,7 @@ def parse_args(parser):
         help="tier 2s in which we want to save the files",
         type=str,
         nargs="+",
-        choices=["lpc", "ucsd"],
+        choices=["lpc", "ucsd", "cern"],
     )
     run_utils.add_bool_arg(
         parser,

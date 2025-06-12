@@ -42,6 +42,8 @@ if args.location == "fermilab":
     eosdir = f"/eos/uscms/store/user/{args.user}/bbbb/{args.processor}/{args.tag}/{args.year}/"
 elif args.location == "ucsd":
     eosdir = f"/ceph/cms/store/user/{args.user}/bbbb/{args.processor}/{args.tag}/{args.year}/"
+elif args.location == "cern":
+    eosdir = f"/eos/user/{args.user[0]}/{args.user}/bbbb/{args.processor}/{args.tag}/{args.year}/"
 
 samples = [str(dir_path.name) for dir_path in Path(eosdir).iterdir()]
 jdls = [str(jdl.name) for jdl in Path(f"condor/{args.processor}/{args.tag}/").iterdir() if str(jdl).endswith(".jdl")]
