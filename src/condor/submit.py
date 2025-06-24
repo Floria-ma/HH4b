@@ -65,7 +65,7 @@ def main(args):
 
     # make eos dir
     if args.site == "cern":
-        pdir = Path(f"eos/user/e/{username}/bbbb/{args.processor}/")
+        pdir = Path(f"eos/user/{username[0]}/{username}/bbbb/{args.processor}/")
     else: 
         pdir = Path(f"store/user/{username}/bbbb/{args.processor}/")
         
@@ -177,7 +177,7 @@ def parse_args(parser):
         default=False,
         help="test run or not - test run means only 2 jobs per sample will be created",
     )
-    parser.add_argument("--files-per-job", default=20, help="# files per condor job", type=int)
+    parser.add_argument("--files-per-job", default=10, help="# files per condor job", type=int)
     run_utils.add_bool_arg(
         parser, "submit", default=False, help="submit files as well as create them"
     )
