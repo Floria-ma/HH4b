@@ -346,7 +346,10 @@ def load_samples(
         if label != "data" and load_weight_noxsec:
             load_columns = columns + format_columns([("weight_noxsec", 1)])
 
-        events_dict[label] = []  # list of directories we load in for this sample
+        # events_dict[label] = []  # list of directories we load in for this sample
+
+        sample_events = [] # list of dataframes we load in for this sample
+
         for sample in full_samples_list:
             # check if this directory passes our selector string
             if not check_selector(sample, selector):
@@ -364,15 +367,23 @@ def load_samples(
             try:
                 non_empty_passed_list = []
                 for parquet_file in parquet_path.glob("*.parquet"):
-                    if not pd.read_parquet(parquet_file).empty:
-                        df_sample = pd.read_parquet(
-                            parquet_file, filters=filters, columns=load_columns
-                        )
+                    df_sample = pd.read_parquet(
+                        parquet_file, filters=filters, columns=load_columns
+                    )
+                    if not df_sample.empty:
                         non_empty_passed_list.append(df_sample)
+                        print(f"Loaded {parquet_file} with {len(df_sample)} entries")
+
+                if not non_empty_passed_list:
+                    warnings.warn(f"No entries in parquet files for {sample}!", stacklevel=1)
+                    continue
+
+                # print(f"Concatenating non_empty_passed_list with {len(non_empty_passed_list)} entries")
                 events = pd.concat(non_empty_passed_list)
-            except Exception:
+
+            except Exception as e:
                 warnings.warn(
-                    f"Can't read file with requested columns/filters for {sample}!", stacklevel=1
+                    f"Can't read file with requested columns/filters for {sample}! File: {parquet_file}. Error {str(e)}.", stacklevel=1
                 )
                 continue
 
@@ -405,13 +416,20 @@ def load_samples(
                     events["weight_nonorm"] = events["weight"]
                     events["finalWeight"] = events["weight"] / n_events
 
-            events_dict[label].append(events)
+            #events_dict[label].append(events)
+            sample_events.append(events)
             logger.info(f"Loaded {sample: <50}: {len(events)} entries")
 
-        if len(events_dict[label]):
-            events_dict[label] = pd.concat(events_dict[label])
+        if sample_events: # Only concatenate if we have any events
+            events_dict[label] = pd.concat(sample_events)
         else:
-            del events_dict[label]
+            warnings.warn(
+                f"No events loaded for {label} from {data_dir}!", stacklevel=1,
+            )
+        # if len(events_dict[label]):
+        #     events_dict[label] = pd.concat(events_dict[label])
+        # else:
+        #     del events_dict[label]
 
     return events_dict
 
