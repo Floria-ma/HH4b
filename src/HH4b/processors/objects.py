@@ -39,7 +39,7 @@ def jetid_v12(jets: ak.Array) -> tuple[ak.Array, ak.Array]:
 
 def jetid_v14(jets: ak.Array) -> tuple[ak.Array, ak.Array]:
     """
-    Jet ID fix for NanoAOD v14 copying
+    Jet ID fix for NanoAOD v14 copying (this also works for v13, v15)
     # https://gitlab.cern.ch/cms-jetmet/coordination/coordination/-/issues/117#note_8880788
     """
 
@@ -190,8 +190,10 @@ def good_ak4jets(jets: JetArray, year: str, nano_version: str):
         elif nano_version.startswith("v14"):
             jetidtight = jets.isTight
             jetidtightlepveto = jets.isTightLeptonVeto
-        elif nano_version.startswith(("v13", "v15")):
-            raise NotImplementedError("Jet ID fix for NanoAOD v13, v14, v15 not implemented yet!")
+        elif nano_version.startswith("v15"):   # TODO: Is this correct, there is the jetid_v14 function, but it is not used for v14??
+            jetidtight, jetidtightlepveto = jetid_v14(jets)
+        elif nano_version.startswith(("v13")):
+            raise NotImplementedError("Jet ID fix for NanoAOD v13, not implemented yet!") 
         else:
             jetidtight, jetidtightlepveto = jets.isTight, jets.isTightLepVeto
 
@@ -264,7 +266,10 @@ def get_ak8jets(fatjets: FatJetArray):
         fatjets["particleNetWithMass_TvsQCD"] = fatjets.particleNetWithMass_TvsQCD
 
     # "legacy version"
-    if "particleNetLegacy_Xbb" in fatjets_fields:
+    # Hot fix because for some reason the nano v15 files have particleNetLegacy_Xbb, but not some of the other branches in this block
+    # Actual fix would be to just sort out nano v15 properly
+    # TODO: Add separate relabeling for v15; currently particleNetLegacy_Xbb not handled properly, doesn't come with all the same variables as below
+    if "particleNetLegacy_Xbb" in fatjets_fields and "globalParT3_Xbb" not in fatjets_fields: 
         fatjets["TXbb_legacy"] = fatjets.particleNetLegacy_Xbb / (
             fatjets.particleNetLegacy_Xbb + fatjets.particleNetLegacy_QCD
         )
@@ -430,7 +435,7 @@ def good_ak8jets(
 
     # Data does not have .neHEF etc. fields for fatjets, so above recipe doesn't work
     # Either way, doesn't matter since we only use tightID, and it is correct for eta < 2.7
-    if nano_version.startswith("v14"):
+    if nano_version.startswith(("v13", "v14", "v15")):
         jetidtight, _ = jetid_v14(fatjets)
     else:
         jetidtight = fatjets.isTight
