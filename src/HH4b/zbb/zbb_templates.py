@@ -19,12 +19,12 @@ YEARS_COMBINED_DICT = {
 }
 SCRIPT_DIR = Path(__file__).resolve().parent
 
-PROCESSED_PATH: Path = Path("Zbb_events_combined.pkl")
-PROCESSED_PATH_ERAS: Path = Path("Zbb_events_eras.pkl")
-APPLY_Zto2Q_CORR: bool = True
+PROCESSED_PATH: Path = Path("/eos/user/e/eheikkil/zbb_templates/ZbbHTJun18_v12v2_private_zbb/Zbb_events_combined.pkl")
+PROCESSED_PATH_ERAS: Path = Path("/eos/user/e/eheikkil/zbb_templates/ZbbHTJun18_v12v2_private_zbb/Zbb_events_eras.pkl")
+APPLY_Zto2Q_CORR: bool = False
 APPLY_TRIGGER_SF: bool = True
 
-SAMPLES_DICT = {
+SAMPLES_DICT = { # TODO: Update for scouting
     "data": [f"{key}_Run" for key in ["JetMET"]],
     "ttbar": ["TTto4Q", "TTtoLNu2Q"],
     "qcd": ["QCD_HT"],
@@ -43,7 +43,7 @@ def parse_args():
     parser.add_argument(
         "--data-dir",
         type=str,
-        default="/ceph/cms/store/user/zichun/bbbb/skimmer/ZbbHT25May28_v12v2_private_zbb/",
+        default="/eos/user/e/eheikkil/bbbb/skimmer/ZbbHTJun18_v12v2_private_zbb/",
         help="Directory containing the Zbb data",
     )
 
@@ -260,7 +260,7 @@ def main():
         return sf, sf_up, sf_down
 
     # if True, apply the Z->2Q corrections from ZMuMu measurement
-    if APPLY_Zto2Q_CORR:
+    if APPLY_Zto2Q_CORR: # TODO: Scouting analysis needs this redone?
         print("Applying Z->2Q corrections from ZMuMu measurement...")
         corr_dir = Path("ZMuMu_corrs")
         corr_dict = {}
@@ -278,6 +278,7 @@ def main():
         corr_dict = None
         print("Z->2Q corrections are not applied.")
 
+    path_dir = "/eos/user/e/eheikkil/bbbb/skimmer/ZbbHTJun18_v12v2_private_zbb/"
     if args.reprocess or not PROCESSED_PATH.exists():
         events_dict = {}
         for year in YEARS:
@@ -287,54 +288,54 @@ def main():
             for sample, sample_list in SAMPLES_DICT.items():
                 print(f"Loading {sample} for {year}...")
                 triggers_cols = [(trigger, 1) for trigger in triggers[year]]
-
-                # append the event dictionary for each year
                 columns = triggers_cols + base_columns + extra_columns_dict.get(sample, [])
-                dataframes = {
-                    **utils.load_samples(
-                        data_dir=args.data_dir,
+                
+                loaded_data = utils.load_samples(
+                        data_dir=path_dir,
                         samples={sample: sample_list},
                         year=year,
                         columns=utils.format_columns(columns),
                         variations=True,
                         weight_shifts=["FSRPartonShower", "ISRPartonShower", "pileup"],
                     )
-                }
-                # concatenate all dataframes in this sample
-                events_dict[year][sample] = []
-                for _, df in dataframes.items():
-                    # if pT variations are not present, set them to pT
-                    for pt_var in ["bbFatJetPt"] + pt_variations:
-                        if pt_var not in df.columns:
-                            for i in range(2):
-                                df[f"{pt_var}{i}"] = df[("bbFatJetPt", i)].copy()
 
-                    # if mass variations are not present, set them to mass
-                    for mass_var in [
-                        "bbFatJetMsd",
-                        "bbFatJetParTmassVis",
-                        "bbFatJetPNetMassLegacy",
-                    ] + mass_variations:
-                        if mass_var not in df.columns:
-                            for i in range(2):
-                                df[f"{mass_var}{i}"] = df[(mass_var.split("_")[0], i)].copy()
+                if (not loaded_data) or (sample not in loaded_data):
+                    print(f"No data loaded for {sample} in {year}. Skipping...")
+                    continue   
 
-                    if sample != "data":
-                        # evaluate trigger scale factors
-                        sf, sf_up, sf_down = eval_trigger_sf(
-                            txbb=df[(txbb_score, 0)].values,
-                            pt=df[("bbFatJetPt", 0)].values,
-                            msd=df[("bbFatJetMsd", 0)].values,
-                            year=year,
-                        )
-                        df["SF_trigger"] = sf
-                        df["SF_trigger_up"] = sf_up
-                        df["SF_trigger_down"] = sf_down
+                df = loaded_data[sample]
+            
+                for pt_var in ["bbFatJetPt"] + pt_variations:
+                    if pt_var not in df.columns:
+                        for i in range(2):
+                            df[f"{pt_var}{i}"] = df[("bbFatJetPt", i)].copy()
 
-                    events_dict[year][sample].append(df)
+                # if mass variations are not present, set them to mass
+                for mass_var in [
+                    "bbFatJetMsd",
+                    "bbFatJetParTmassVis",
+                    "bbFatJetPNetMassLegacy",
+                ] + mass_variations:
+                    if mass_var not in df.columns:
+                        for i in range(2):
+                            df[f"{mass_var}{i}"] = df[(mass_var.split("_")[0], i)].copy()
+
+                if sample != "data":
+                    # evalute trigger scale factors
+                    sf, sf_up, sf_down = eval_trigger_sf(
+                        txbb=df[("bbFatJetParTTXbb", 0)].values, # TODO: Does this need changing for glopartv3?
+                        pt=df[("bbFatJetPt", 0)].values,
+                        msd=df[("bbFatJetMsd", 0)].values,
+                        year=year,
+                    )
+                    df["SF_trigger"] = sf
+                    df["SF_trigger_up"] = sf_up
+                    df["SF_trigger_down"] = sf_down
+
+                events_dict[year][sample] = df
 
                 # concatenate all dataframes for this sample
-                events_dict[year][sample] = pd.concat(events_dict[year][sample], ignore_index=True)
+                # events_dict[year][sample] = pd.concat(events_dict[year][sample], ignore_index=True)
 
         # Combine events from different years into a single dictionary
         print("Combining events from different years...")
@@ -543,7 +544,7 @@ def main():
         weight_shifts_trig_sf = {}
 
     print("Making templates...")
-    out_dir = SCRIPT_DIR / args.outdir
+    out_dir = Path(f"/eos/user/e/eheikkil/zbb_templates/ZbbHTJun18_v12v2_private_zbb/templates_zbb")
     out_dir.mkdir(parents=True, exist_ok=True)
     for year in YEARS_COMBINED_DICT:
 
