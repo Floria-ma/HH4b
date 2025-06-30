@@ -76,15 +76,31 @@ gen_selection_dict = {
 txbbstr_to_branch = {
     "pnet-legacy": "TXbb_legacy",
     "pnet-v12": "Txbb",
-    "glopart-v2": "ParTTXbb",
+    "glopart-v2": "ParT2TXbb",
+    "glopart-v3": "ParT3TXbb",
 }
 
 # map txbb string to skimmer variable name
 txbbstr_to_skimmer = {
     "pnet-legacy": "PNetTXbbLegacy",
     "pnet-v12": "PNetTXbb",
-    "glopart-v2": "ParTTXbb",
+    "glopart-v2": "ParT2TXbb", 
+    "glopart-v3": "ParT3TXbb",
 }
+# TODO: Figure out what is the purpose of these, they are redefined inside the bbbbSkimmer class definition?
+# # map txbb string to branch name
+# txbbstr_to_branch = {
+#     "pnet-legacy": "TXbb_legacy",
+#     "pnet-v12": "Txbb",
+#     "glopart-v2": "ParTTXbb",
+# }
+
+# # map txbb string to skimmer variable name
+# txbbstr_to_skimmer = {
+#     "pnet-legacy": "PNetTXbbLegacy",
+#     "pnet-v12": "PNetTXbb",
+#     "glopart-v2": "ParTTXbb",
+# }
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -98,6 +114,7 @@ class bbbbSkimmer(SkimmerABC):
     (and triggers for data).
     """
 
+    # Why on earth are we changing the names of the variables??????????????????? TODO: Ask santeri / patin
     # key is name in nano files, value will be the name in the skimmed output
     skim_vars = {  # noqa: RUF012
         "Jet": {
@@ -113,7 +130,7 @@ class bbbbSkimmer(SkimmerABC):
             **P4,
             "id": "Id",
         },
-        "FatJet": {
+        "FatJet": { # TODO: Likely have to edit this if I want the glopartv3 to work well. What should it be after skimming though?
             **P4,
             "msoftdrop": "Msd",
             "Txbb": "PNetTXbb",  # these are discriminants
@@ -482,6 +499,7 @@ class bbbbSkimmer(SkimmerABC):
         else:
             self.bdt_model = None
 
+        # TODO: Nano v15 
         # JMSR
         self.jmsr_vars = ["msoftdrop", "particleNet_mass"]
         if self._nano_version == "v12v2_private":
@@ -568,7 +586,7 @@ class bbbbSkimmer(SkimmerABC):
                 **self.skim_vars["FatJet"],
                 **{var: var for var in extra_vars},
             }
-        if self._nano_version == "v14_25v2":
+        if self._nano_version == "v14_25v2": 
             extra_vars = [
                 # ParT 2
                 "ParT2PQCD1HF",
@@ -596,14 +614,43 @@ class bbbbSkimmer(SkimmerABC):
                 "ParT3massGeneric",
                 "ParT3massCorrX2p",
             ]
+
             self.skim_vars["FatJet"] = {
                 **self.skim_vars["FatJet"],
                 **{var: var for var in extra_vars},
             }
 
-            txbbstr_to_branch["glopart-v2"] = "ParT2TXbb"
+            txbbstr_to_branch["glopart-v2"] = "ParT2TXbb" # This seems unnecessary to me?
             txbbstr_to_branch["glopart-v3"] = "ParT3TXbb"
             txbbstr_to_skimmer["glopart-v2"] = "ParT2TXbb"
+            txbbstr_to_skimmer["glopart-v3"] = "ParT3TXbb"
+
+        if self._nano_version == "v15": # TODO: Check with Zichun that this is legal?
+            # No ParT2 in v15
+            extra_vars = [
+            "ParT3PQCD",
+            "ParT3PTopbWev",
+            "ParT3PTopbWmv",
+            "ParT3PTopbWq",
+            "ParT3PTopbWqq",
+            "ParT3PTopbWtauhv",
+            "ParT3PXbb",
+            "ParT3PXcc",
+            "ParT3PXcs",
+            "ParT3PXqq",
+            "ParT3TXbb",
+            "ParT3massGeneric",
+            "ParT3massCorrX2p",
+            ]
+
+            self.skim_vars["FatJet"] = {
+                **self.skim_vars["FatJet"],
+                **{var: var for var in extra_vars},
+            }
+
+            # txbbstr_to_branch["glopart-v2"] = "ParT2TXbb"
+            txbbstr_to_branch["glopart-v3"] = "ParT3TXbb"
+            # txbbstr_to_skimmer["glopart-v2"] = "ParT2TXbb"
             txbbstr_to_skimmer["glopart-v3"] = "ParT3TXbb"
 
         logger.info(f"Running skimmer with systematics {self._systematics}")
@@ -882,13 +929,14 @@ class bbbbSkimmer(SkimmerABC):
 
         # AK8 Jet variables
         fatjet_skimvars = self.skim_vars["FatJet"]
-        if not isData:
+        if not isData: 
             fatjet_skimvars = {**fatjet_skimvars, "pt_gen": "MatchedGenJetPt"}
+            print(fatjet_skimvars)
         ak8FatJetVars = {
             f"ak8FatJet{key}": pad_val(fatjets[var], 3, axis=1)
             for (var, key) in fatjet_skimvars.items()
         }
-        bbFatJetVars = {
+        bbFatJetVars = { # TODO: No bbFatJetParT3TXbb key for nano v15, where should that come from?
             f"bbFatJet{key}": pad_val(fatjets_xbb[var], 2, axis=1)
             for (var, key) in fatjet_skimvars.items()
         }
@@ -1274,6 +1322,12 @@ class bbbbSkimmer(SkimmerABC):
                     | (np.sum(bbFatJetVars["bbFatJetParT3TXbb"][:, :2] >= 0.1, axis=1) >= 1)
                     | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1)
                 )
+            if self._nano_version.startswith("v15"):
+                # ParT3 in v15
+                cut_txbb = (
+                    (np.sum(bbFatJetVars["bbFatJetParT3TXbb"][:, :2] >= 0.1, axis=1) >= 1)
+                    # | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1) # TODO: Ask Santeri if this is needed
+                )
             else:
                 cut_txbb = (np.sum(bbFatJetVars["bbFatJetParTTXbb"][:, :2] >= 0.1, axis=1) >= 1) | (
                     np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1
@@ -1542,7 +1596,7 @@ class bbbbSkimmer(SkimmerABC):
         h1ak4away1 = h1 + ak4away1
         h2ak4away2 = h2 + ak4away2
 
-        if self._nano_version.startswith("v14"):
+        if self._nano_version.startswith(("v14", "v15")): # TODO: Check if v15 can just be added here like this, v15 only has ParT3
             # v14 has ParT2 and ParT3
             H1Xbb = disc_TXbb(bbFatJetVars[key_map("bbFatJetParT3TXbb")][:, 0])
             H1Mass = bbFatJetVars[key_map("ParT3massCorrX2p")][:, 0]
