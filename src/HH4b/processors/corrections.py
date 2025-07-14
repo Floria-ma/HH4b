@@ -240,17 +240,26 @@ class JECs:
             self.jet_factory["ak8"] = jmestuff["fatjet_factory"]
             self.met_factory = jmestuff["met_factory"]
 
-    def _add_jec_variables(self, jets: JetArray, event_rho: ak.Array, isData: bool) -> JetArray:
+    def _add_jec_variables(self, jets: JetArray, event_rho: ak.Array, isData: bool, use_scouting: bool = False) -> JetArray:
         """add variables needed for JECs"""
-        jets["pt_raw"] = (1 - jets.rawFactor) * jets.pt
-        jets["mass_raw"] = (1 - jets.rawFactor) * jets.mass
-        jets["event_rho"] = ak.broadcast_arrays(event_rho, jets.pt)[0]
-        if not isData:
-            # gen pT needed for smearing
-            jets["pt_gen"] = ak.values_astype(ak.fill_none(jets.matched_gen.pt, 0), np.float32)
+        if not use_scouting:
+            jets["pt_raw"] = (1 - jets.rawFactor) * jets.pt 
+            jets["mass_raw"] = (1 - jets.rawFactor) * jets.mass
+            jets["event_rho"] = ak.broadcast_arrays(event_rho, jets.pt)[0]
+            if not isData:
+                # gen pT needed for smearing
+                jets["pt_gen"] = ak.values_astype(ak.fill_none(jets.matched_gen.pt, 0), np.float32)
+        else:
+            # Scouting jets do not have rawFactor, so we use pt and mass directly
+            jets["pt_raw"] = jets.pt
+            jets["mass_raw"] = jets.mass
+            jets["event_rho"] = ak.broadcast_arrays(event_rho, jets.pt)[0]
+            if not isData:
+                jets["pt_gen"] = ak.values_astype(ak.fill_none(jets.matched_gen.pt, 0), np.float32)
+
         return jets
 
-    def get_jec_jets(
+    def get_jec_jets( 
         self,
         events: NanoEventsArray,
         jets: FatJetArray,
@@ -261,17 +270,25 @@ class JECs:
         applyData: bool = False,
         dataset: str | None = None,
         nano_version: str = "v12",
+        use_scouting: bool = False,
     ) -> FatJetArray:
         """
         If ``jecs`` is not None, returns the shifted values of variables are affected by JECs.
         """
+        if not use_scouting:
+            rho = (
+                events.Rho.fixedGridRhoFastjetAll # TODO: What is this? Rho? Answer: some correction sensitive for pileup
+                if "Rho" in events.fields
+                else events.fixedGridRhoFastjetAll
+            )
+        else:
+            rho = (
+                events.ScoutingRho.fixedGridRhoFastjetAll # TODO: What is this? Rho? Answer: some correction sensitive for pileup
+                if "ScoutingRho" in events.fields
+                else events.fixedGridRhoFastjetAll
+            )
 
-        rho = (
-            events.Rho.fixedGridRhoFastjetAll
-            if "Rho" in events.fields
-            else events.fixedGridRhoFastjetAll
-        )
-        jets = self._add_jec_variables(jets, rho, isData)
+        jets = self._add_jec_variables(jets, rho, isData, use_scouting=use_scouting)
 
         apply_jecs = ak.any(jets.pt) if (applyData or not isData) else False
         if "v12" not in nano_version:

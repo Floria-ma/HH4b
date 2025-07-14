@@ -94,7 +94,7 @@ def run(p: processor, fileset: dict, skipbadfiles: bool, args):
     run_utils.add_mixins(nanoevents)  # update nanoevents schema
 
     # outputs are saved here as pickles
-    outdir = "./outfiles"
+    outdir = "/eos/user/e/eheikkil/cutflow_checking/" # "./outdir"
     os.system(f"mkdir -p {outdir}")
 
     save_parquet = {
@@ -126,7 +126,7 @@ def run(p: processor, fileset: dict, skipbadfiles: bool, args):
     run = processor.Runner(
         executor=executor,
         savemetrics=True,
-        schema=nanoevents.NanoAODSchema,
+        schema=nanoevents.PFNanoAODSchema,
         chunksize=args.chunksize,
         maxchunks=None if args.maxchunks == 0 else args.maxchunks,
         skipbadfiles=skipbadfiles,
@@ -190,6 +190,7 @@ def main(args):
         args.region,
         args.nano_version,
         args.txbb,
+        args.use_scouting,
     )
 
     skipbadfiles = True
@@ -258,6 +259,8 @@ if __name__ == "__main__":
         help="sample name of files being run on, if --files option used",
     )
     parser.add_argument("--yaml", default=None, help="yaml file", type=str)
+    # parser.add_argument("--use-scouting", action="store_true", help="use scouting variables in processor")
+    
 
     args = parser.parse_args()
 

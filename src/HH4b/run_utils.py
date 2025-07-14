@@ -32,6 +32,10 @@ def add_mixins(nanoevents):
     nanoevents.PFNanoAODSchema.mixins["SubJet"] = "FatJet"
     nanoevents.PFNanoAODSchema.mixins["PFCands"] = "PFCand"
     nanoevents.PFNanoAODSchema.mixins["SV"] = "PFCand"
+    nanoevents.PFNanoAODSchema.mixins["ScoutingFatPFJetRecluster"] = "FatJet"
+    nanoevents.PFNanoAODSchema.mixins["ScoutingPFJetRecluster"] = "Jet"
+    nanoevents.PFNanoAODSchema.all_cross_references["ScoutingFatPFJetRecluster_genJetAK8Idx"] = "GenJetAK8"
+    nanoevents.PFNanoAODSchema.all_cross_references["ScoutingPFJetRecluster_genJetIdx"] = "GenJet"
 
 
 def print_red(s):
@@ -74,7 +78,7 @@ def check_branch(git_branch: str, git_user: str = "LPC-HH", allow_diff_local_rep
             print_red("Exiting! Use the --allow-diff-local-repo option to override this.")
             sys.exit(1)
 
-
+# TODO: Make this work for scouting + nano v15
 def get_fileset(
     processor: str,  # noqa: ARG001
     year: int,
@@ -133,6 +137,7 @@ def get_processor(
     region: str | None = None,
     nano_version: str | None = None,
     txbb: str | None = None,
+    use_scouting: bool = False,
 ):
     # define processor
     if processor == "skimmer":
@@ -144,6 +149,7 @@ def get_processor(
             region=region,
             nano_version=nano_version,
             txbb=txbb,
+            use_scouting=use_scouting
         )
 
     if processor == "ttSkimmer":
@@ -176,7 +182,7 @@ def parse_common_args(parser):
         type=str,
         default="glopart-v2",
         required=True,
-        choices=["pnet-legacy", "pnet-v12", "glopart-v2", "glopart-v3"],
+        choices=["pnet-legacy", "pnet-v12", "glopart-v2", "glopart-v3", "glopart-scouting"],
         help="TXbb version to be used to order FatJets",
     )
     parser.add_argument(
@@ -195,6 +201,8 @@ def parse_common_args(parser):
             "v12v2_private",
             "v12_ZbbSFZMuMu",
             "v14_25v2",
+            "v15",
+            "v15_scouting",
         ],
         help="NanoAOD version",
     )
@@ -231,6 +239,7 @@ def parse_common_args(parser):
     )
     add_bool_arg(parser, "save-systematics", default=False, help="save systematic variations")
     add_bool_arg(parser, "save-root", default=False, help="save root ntuples too")
+    add_bool_arg(parser, "use-scouting", default=False, help="use scouting variables in processor")
 
 
 def flatten_dict(var_dict: dict):
