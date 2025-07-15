@@ -94,7 +94,7 @@ def run(p: processor, fileset: dict, skipbadfiles: bool, args):
     run_utils.add_mixins(nanoevents)  # update nanoevents schema
 
     # outputs are saved here as pickles
-    outdir = "/eos/user/e/eheikkil/cutflow_checking/" # "./outdir"
+    outdir = "./outdir" # "/eos/user/e/eheikkil/cutflow_checking/"
     os.system(f"mkdir -p {outdir}")
 
     save_parquet = {

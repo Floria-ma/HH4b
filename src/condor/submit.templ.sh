@@ -49,24 +49,23 @@ for t2_prefix in ${t2_prefixes}; do
     echo "Copying output to ${t2_prefix}/${outdir}"
 
     echo "Copying pickle file..."
-    xrdcp -f outfiles/* "${t2_prefix}/${outdir}/pickles/out_${jobnum}.pkl"
+    xrdcp -f outfiles/* "$${t2_prefix}/${outdir}/pickles/out_${jobnum}.pkl"
     if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to copy pickle file to ${t2_prefix}/${outdir}/pickles" >&2
+        echo "ERROR: Failed to copy pickle file to $${t2_prefix}/${outdir}/pickles" >&2
     fi
 
     echo "Copying parquet file..."
-    xrdcp -f *.parquet "${t2_prefix}/${outdir}/parquet/out_${jobnum}.parquet"
+    xrdcp -f *.parquet "$${t2_prefix}/${outdir}/parquet/out_${jobnum}.parquet"
     if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to copy parquet file to ${t2_prefix}/${outdir}/parquet" >&2
+        echo "ERROR: Failed to copy parquet file to $${t2_prefix}/${outdir}/parquet" >&2
     fi
 
     echo "Copying ROOT file..."
-    xrdcp -f *.root "${t2_prefix}/${outdir}/root/nano_skim_${jobnum}.root"
+    xrdcp -f *.root "$${t2_prefix}/${outdir}/root/nano_skim_${jobnum}.root"
     if [ $? -ne 0 ]; then
-        echo "ERROR: Failed to copy ROOT file to ${t2_prefix}/${outdir}/root" >&2
+        echo "ERROR: Failed to copy ROOT file to $${t2_prefix}/${outdir}/root" >&2
     fi
 done
-
 
 rm *.parquet
 rm *.root
