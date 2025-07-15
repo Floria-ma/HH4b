@@ -173,6 +173,7 @@ class bbbbSkimmer(SkimmerABC):
             "ScoutParTPXtauhtaue": "ScoutParTPXtauhtaue",
             "ScoutParTPXtauhtauh": "ScoutParTPXtauhtauh",
             "ScoutParTPXtauhtaum": "ScoutParTPXtauhtaum",
+            "particleNet_mass": "PNetMass", # TODO: Not sure why this is needed; please help someone
         },
         "GenHiggs": P4,
         "Event": {
@@ -546,7 +547,7 @@ class bbbbSkimmer(SkimmerABC):
 
         # TODO: is this only needed for BDT? 
         # JMSR
-        self.jmsr_vars = ["msoftdrop", "particleNet_mass"]
+        self.jmsr_vars = ["msoftdrop", "particleNet_mass"] # if not self.use_scouting else ["msoftdrop"] # Why are we using particleNet_mass here? Can I just take it away?
         if self._nano_version == "v12v2_private":
             self.jmsr_vars += ["particleNet_mass_legacy", "ParTmassVis"]
         if self._nano_version == "v12_private":
@@ -689,7 +690,8 @@ class bbbbSkimmer(SkimmerABC):
             txbbstr_to_skimmer["glopart-v3"] = "ParT3TXbb"
 
         if self._nano_version == "v15_scouting":
-            # scoutGlobalParT (glopartv3 trained on scouting MC) in v15_scouting
+            # scoutGlobalParT (glopartv3 trained on scouting MC) in v15_scouting (for MC and data)
+            # also have GloParT-v3 available for scouting MC offline reconstruction
             extra_vars = [ 
             "ParT3PQCD",
             "ParT3PTopbWev",
@@ -717,8 +719,10 @@ class bbbbSkimmer(SkimmerABC):
                     **{var: var for var in extra_vars},
                 }
 
-            txbbstr_to_branch["glopart-v3"] = "ParT3TXbb" # Note that this corresponds to scoutGlobalParT
+            txbbstr_to_branch["glopart-v3"] = "ParT3TXbb" 
             txbbstr_to_skimmer["glopart-v3"] = "ParT3TXbb"
+            txbbstr_to_branch["glopart-scouting"] = "ScoutParTTXbb" 
+            txbbstr_to_skimmer["glopart-scouting"] = "ScoutParTTXbb"
 
         logger.info(f"Running skimmer with systematics {self._systematics}")
 
@@ -1073,6 +1077,7 @@ class bbbbSkimmer(SkimmerABC):
                     # overwrite saved mass vars with corrected ones
                     label = "" if shift == "" else "_" + shift
                     bbFatJetVars[f"bbFatJet{key}{label}"] = vals
+
         elif self._region == "zbb" and isJECs:
             # JECs and JMSR for Zbb
             # FatJet JEC variables
@@ -1083,7 +1088,7 @@ class bbbbSkimmer(SkimmerABC):
                         bbFatJetVars[f"bbFatJet{key}_{shift}"] = pad_val(vals, 2, axis=1)
 
             # FatJet JMSR
-            for var in self.jmsr_vars:
+            for var in self.jmsr_vars: 
                 key = fatjet_skimvars[var]
                 bbFatJetVars[f"bbFatJet{key}_raw"] = bbFatJetVars[f"bbFatJet{key}"]
                 for shift, vals in bb_jmsr_shifted_vars[var].items():
