@@ -139,8 +139,6 @@ class bbbbSkimmer(SkimmerABC):
             # "scoutGlobalParT_prob_Xtauhtaue": "ScoutParTPXtauhtaue",
             # "scoutGlobalParT_prob_Xtauhtauh": "ScoutParTPXtauhtauh",
             # "scoutGlobalParT_prob_Xtauhtaum": "ScoutParTPXtauhtaum",
-            # "scoutGlobalParT_massCorrGeneric": "ScoutParTmassGeneric",
-            # "scoutGlobalParT_massCorrGenericX2p": "ScoutParTmassCorrX2p"
         },
         "Lepton": {
             **P4,
@@ -174,6 +172,8 @@ class bbbbSkimmer(SkimmerABC):
             "ScoutParTPXtauhtauh": "ScoutParTPXtauhtauh",
             "ScoutParTPXtauhtaum": "ScoutParTPXtauhtaum",
             "particleNet_mass": "PNetMass", # TODO: Not sure why this is needed; please help someone
+            "scoutGlobalParT_massCorrGeneric": "ScoutParTmassGeneric",
+            "scoutGlobalParT_massCorrGenericX2p": "ScoutParTmassCorrX2p"
         },
         "GenHiggs": P4,
         "Event": {
