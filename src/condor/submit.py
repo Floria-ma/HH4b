@@ -134,6 +134,9 @@ def main(args):
                         "--save-systematics" if args.save_systematics else "--no-save-systematics"
                     ),
                     "region": f"--region {args.region}" if "skimmer" in args.processor else "",
+                    "use_scouting": (
+                        "--use-scouting" if args.use_scouting else "--no-use-scouting"
+                    ),
                 }
                 write_template(sh_templ, localsh, sh_args)
                 os.system(f"chmod u+x {localsh}")
