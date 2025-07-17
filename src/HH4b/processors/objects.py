@@ -548,24 +548,25 @@ def ak4_jets_awayfromak8(
     electron_pt: float,
     muon_pt: float,
     sort_by: str = "btag",
+    use_scouting: bool = False,
 ):
     """AK4 jets nonoverlapping with AK8 fatjets"""
-    electrons = events.Electron
+    electrons = events.Electron if not use_scouting else events.ScoutingElectron
     electrons = electrons[electrons.pt > electron_pt]
 
-    muons = events.Muon
+    muons = events.Muon if not use_scouting else events.ScoutingMuon
     muons = muons[muons.pt > muon_pt]
 
     ak4_sel = (
         (jets.pt >= pt)
         & (np.abs(jets.eta) <= eta_max)
         & (ak.all(jets.metric_table(fatjets) > dr_fatjets, axis=2))
-        & ak.all(jets.metric_table(electrons) > dr_leptons, axis=2)
+        & ak.all(jets.metric_table(electrons) > dr_leptons, axis=2) 
         & ak.all(jets.metric_table(muons) > dr_leptons, axis=2)
     )
 
     # return top 2 jets sorted by btagPNetB
-    if sort_by == "btag":
+    if sort_by == "btag": # TODO: This probably doesn't work for scouting right now
         jets_pnetb = jets[ak.argsort(jets.btagPNetB, ascending=False)]
         return jets_pnetb[ak4_sel][:, :2]
     # return 2 jets closet to fatjet0 and fatjet1, respectively

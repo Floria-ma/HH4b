@@ -127,7 +127,7 @@ class bbbbSkimmer(SkimmerABC):
             "btagPNetCvL": "btagPNetCvL",
             "btagPNetQvG": "btagPNetQvG",
         },
-        "ScoutingPFJetRecluster": { # TODO: Why don't GloParT variables exist in ak4 jets
+        "ScoutingPFJetRecluster": { 
             **P4, 
             # Variables below not needed / also do not exist?
             # "scoutGlobalParT_prob_QCD": "ScoutParTPQCD",
@@ -276,7 +276,6 @@ class bbbbSkimmer(SkimmerABC):
         self.XSECS = xsecs if xsecs is not None else {}  # in pb
         self.txbb = txbb
         self.use_scouting = use_scouting
-        # print(self.use_scouting)
 
         # DST selection (scouting only)
         DSTs = {
@@ -775,24 +774,22 @@ class bbbbSkimmer(SkimmerABC):
         #########################
         print("starting object selection", f"{time.time() - start:.2f}")
 
-        # Leptons
-        veto_muon_sel = veto_muons(events.Muon)
-        veto_electron_sel = veto_electrons(events.Electron)
-        if self._region != "signal":
-            good_muon_sel = good_muons(events.Muon)
-            muons = events.Muon[good_muon_sel]
-            muons["id"] = muons.charge * (13)
+        # Leptons TODO: These cuts are problematic for scouting since electrons are not reconstructed
+        if not self.use_scouting: # Temporary fix, Patin will have to take this out of the conditional, I tried adding the conditionals below but there are missing fields like looseId etc.
+            veto_muon_sel = veto_muons(events.Muon) if not self.use_scouting else veto_muons(events.ScoutingMuon)
+            veto_electron_sel = veto_electrons(events.Electron)  if not self.use_scouting else veto_muons(events.ScoutingElectron) 
+            if self._region != "signal":
+                good_muon_sel = good_muons(events.Muon) if not self.use_scouting else good_muons(events.ScoutingMuon)
+                muons = events.Muon[good_muon_sel] if not self.use_scouting else events.ScoutingMuon[good_muon_sel]
+                muons["id"] = muons.charge * (13)
 
-            good_electron_sel = good_electrons(events.Electron) 
-            electrons = events.Electron[good_electron_sel]
-            electrons["id"] = electrons.charge * (11)
+                # Electrons are not reco'd in scouting so nothing passes the good_electrons() filter
+                good_electron_sel = good_electrons(events.Electron) if not self.use_scouting else good_muons(events.ScoutingElectron)
+                electrons = events.Electron[good_electron_sel] if not self.use_scouting else events.ScoutingElectron[good_electron_sel]
+                electrons["id"] = electrons.charge * (11)
 
         # AK4 Jets
         num_jets = 4
-        print("Scouting ak4 jet fields:", events.ScoutingPFJetRecluster.fields) # Oh they probably get mapped to something stupid
-        # print("Scouting ak8 jet fields:",events.ScoutingFatPFJetRecluster.fields)
-        # print("dir(ScoutingFatPFJetRecluster): ", dir(events.ScoutingFatPFJetRecluster))
-        # print("type(events.ScoutingFatPFJetRecluster):", type(events.ScoutingFatPFJetRecluster))
         jets, jec_shifted_jetvars = JEC_loader.get_jec_jets(
             events,
             events.Jet if not self.use_scouting else events.ScoutingPFJetRecluster, # If we use scouting we use ScoutingPFJetRecluster
@@ -805,7 +802,6 @@ class bbbbSkimmer(SkimmerABC):
             nano_version=self._nano_version,
             use_scouting=self.use_scouting,
         )  
-        print("jet fields after get_jec_jets:", jets.fields)
 
         if JEC_loader.met_factory is not None:
             # check if "MET" attribute exists
@@ -825,7 +821,7 @@ class bbbbSkimmer(SkimmerABC):
                     raise AttributeError("Neither 'MET' nor 'PuppiMET' attribute found in events.")
             if self.use_scouting:
                 if hasattr(events, "ScoutingMET"):
-                    events_met = events.ScoutingMET
+                    events_met = events.ScoutingMET 
                 elif hasattr(events, "PuppiMET"):
                     events_met = events.PuppiMET # TODO: What is this and does this work for scouting?
                     deltaX_up = events_met.ptUnclusteredUp * np.cos(events_met.phiUnclusteredUp)
@@ -837,8 +833,7 @@ class bbbbSkimmer(SkimmerABC):
                 else:
                     raise AttributeError("Neither 'ScoutingMET' nor 'PuppiMET' attribute found in events.")
 
-            met = JEC_loader.met_factory.build(events_met, jets, {}) if isData else events_met
-            # print("met", met) 
+            met = JEC_loader.met_factory.build(events_met, jets, {}) if isData and not self.use_scouting else events_met # TODO: Can we abandon JECs for scouting? A: Yes pretty much
         else:
             if hasattr(events, "MET"):
                 met = events.MET if not self.use_scouting else events.ScoutingMET
@@ -865,7 +860,6 @@ class bbbbSkimmer(SkimmerABC):
 
         # AK8 Jets
         if not self.use_scouting:
-            print(events.FatJet.fields)
             fatjets = get_ak8jets(events.FatJet)  # this adds all our extra variables e.g. TXbb
         else:
             fatjets = get_ak8jets(events.ScoutingFatPFJetRecluster)  # this adds all our extra variables e.g. TXbb
@@ -918,13 +912,15 @@ class bbbbSkimmer(SkimmerABC):
                 jec_shifted_bbfatjetvars[jec_var] = tdict
 
         # VBF objects
-        vbf_jets = objects.vbf_jets(
-            jets,
-            fatjets_xbb[:, :2],
-            events,
-            **self.vbf_jet_selection,
-            **self.vbf_veto_lepton_selection,
-        )
+        # TODO: Can't do in scouting because no electron reco
+        if not self.use_scouting:
+            vbf_jets = objects.vbf_jets(
+                jets,
+                fatjets_xbb[:, :2],
+                events,
+                **self.vbf_jet_selection,
+                **self.vbf_veto_lepton_selection,
+            )   
 
         # AK4 objects away from first two fatjets
         if self._region == "semiboosted":
@@ -949,6 +945,7 @@ class bbbbSkimmer(SkimmerABC):
                 **self.zbb_top_veto_ak4_selection,
                 **self.zbb_top_veto_lepton_selection,
                 sort_by="none",
+                use_scouting=self.use_scouting
             )
         else:
             ak4_jets_awayfromak8 = objects.ak4_jets_awayfromak8(
@@ -1050,8 +1047,6 @@ class bbbbSkimmer(SkimmerABC):
             for (var, key) in fatjet_skimvars.items()
         }
         print("Jet vars", f"{time.time() - start:.2f}")
-        # print("ak8FatJetVars", ak8FatJetVars)
-        # print("bbFatJetVars", bbFatJetVars)
 
         # JEC and JMSR
         if self._region == "signal" and isJECs:
@@ -1103,16 +1098,16 @@ class bbbbSkimmer(SkimmerABC):
             for key, val in self.skim_vars["Event"].items()
             if key in events.fields
         }
-        # print("eventvar keys:", eventVars.keys())
         eventVars["MET_pt"] = met_pt.to_numpy()
         eventVars["ht"] = ht.to_numpy()
         eventVars["nJets"] = ak.sum(jets_sel, axis=1).to_numpy() 
         eventVars["nFatJets"] = ak.num(fatjets).to_numpy()
+
         if isData:
             pileupVars = {key: np.ones(len(events)) * PAD_VAL for key in self.skim_vars["Pileup"]}
         else:
             pileupVars = {key: events.Pileup[key].to_numpy() for key in self.skim_vars["Pileup"]}
-        pileupVars = {**pileupVars, "nPV": events.PV["npvs"].to_numpy()}
+        pileupVars = {**pileupVars, "nPV": events.PV["npvs"].to_numpy()} if not self.use_scouting else {**pileupVars, "nPV": ak.num(events.ScoutingPrimaryVertex, axis = 1).to_numpy()} # TODO: Check if axis = 1 is the correct one to use
 
         # Trigger variables
         HLTs = deepcopy(self.HLTs[year])
@@ -1163,43 +1158,42 @@ class bbbbSkimmer(SkimmerABC):
                 )
                 for trigger in self.DSTs
             }
-            print("self.dsts", self.DSTs)
-            print("DST fields", events.DST.fields)
-            print(ak.sum(DSTVars["2023BPix"]))
-            print("DSTVars", DSTVars)
             print("DST vars", f"{time.time() - start:.2f}")
 
 
         # add trigger objects (for fatjets, id==6)
         # fields: 'pt', 'eta', 'phi', 'l1pt', 'l1pt_2', 'l2pt', 'id', 'l1iso', 'l1charge', 'filterBits'
-        num_trigobjs = 4
-        fatjet_objs = events.TrigObj[(events.TrigObj.id == 6) & (events.TrigObj.pt >= 100)]
-        # sort trigger objects by distance to fatjet_xbb_0 and only save first 3
-        dr_bb0 = ak.flatten(fatjet_objs.metric_table(fatjets_xbb[:, 0:1]), axis=-1)
-        fatjet_objs = fatjet_objs[ak.argsort(dr_bb0)]
-        fatjet_objs["matched_bbFatJet0"] = fatjet_objs.metric_table(fatjets_xbb[:, 0:1]) < 1.0
-        fatjet_objs["matched_bbFatJet1"] = fatjet_objs.metric_table(fatjets_xbb[:, 1:2]) < 1.0
-        fatjet_objs["matched_ak8FatJet0"] = fatjet_objs.metric_table(fatjets[:, 0:1]) < 1.0
-        fatjet_objs["matched_ak8FatJet1"] = fatjet_objs.metric_table(fatjets[:, 1:2]) < 1.0
+        if not self.use_scouting: 
+            # Scouting can't do offline to HLT object matching because we don't have offline objects. The equivalent process
+            # would be to do matching of HLT objects to L1 objects, but these objects are so different that matching doesn't make sense
+            num_trigobjs = 4
+            fatjet_objs = events.TrigObj[(events.TrigObj.id == 6) & (events.TrigObj.pt >= 100)]
+            # sort trigger objects by distance to fatjet_xbb_0 and only save first 3
+            dr_bb0 = ak.flatten(fatjet_objs.metric_table(fatjets_xbb[:, 0:1]), axis=-1)
+            fatjet_objs = fatjet_objs[ak.argsort(dr_bb0)]
+            fatjet_objs["matched_bbFatJet0"] = fatjet_objs.metric_table(fatjets_xbb[:, 0:1]) < 1.0
+            fatjet_objs["matched_bbFatJet1"] = fatjet_objs.metric_table(fatjets_xbb[:, 1:2]) < 1.0
+            fatjet_objs["matched_ak8FatJet0"] = fatjet_objs.metric_table(fatjets[:, 0:1]) < 1.0
+            fatjet_objs["matched_ak8FatJet1"] = fatjet_objs.metric_table(fatjets[:, 1:2]) < 1.0
 
-        trigObjFatJetVars = {
-            f"TriggerObject{key}": pad_val(fatjet_objs[var], num_trigobjs, axis=1)
-            for (var, key) in self.skim_vars["TriggerObject"].items()
-        }
-        # save booleans after padding (flatten will make a different shape than usual arrays)
-        trigObjFatJetVars["TriggerObjectMatched_bbFatJet0"] = pad_val(
-            ak.flatten(fatjet_objs["matched_bbFatJet0"], axis=-1), num_trigobjs, axis=1
-        ).astype(int)
-        trigObjFatJetVars["TriggerObjectMatched_bbFatJet1"] = pad_val(
-            ak.flatten(fatjet_objs["matched_bbFatJet1"], axis=-1), num_trigobjs, axis=1
-        ).astype(int)
-        trigObjFatJetVars["TriggerObjectMatched_ak8FatJet0"] = pad_val(
-            ak.flatten(fatjet_objs["matched_ak8FatJet0"], axis=-1), num_trigobjs, axis=1
-        ).astype(int)
-        trigObjFatJetVars["TriggerObjectMatched_ak8FatJet1"] = pad_val(
-            ak.flatten(fatjet_objs["matched_ak8FatJet1"], axis=-1), num_trigobjs, axis=1
-        ).astype(int)
-        print("TrigObj vars", f"{time.time() - start:.2f}")
+            trigObjFatJetVars = {
+                f"TriggerObject{key}": pad_val(fatjet_objs[var], num_trigobjs, axis=1)
+                for (var, key) in self.skim_vars["TriggerObject"].items()
+            }
+            # save booleans after padding (flatten will make a different shape than usual arrays)
+            trigObjFatJetVars["TriggerObjectMatched_bbFatJet0"] = pad_val(
+                ak.flatten(fatjet_objs["matched_bbFatJet0"], axis=-1), num_trigobjs, axis=1
+            ).astype(int)
+            trigObjFatJetVars["TriggerObjectMatched_bbFatJet1"] = pad_val(
+                ak.flatten(fatjet_objs["matched_bbFatJet1"], axis=-1), num_trigobjs, axis=1
+            ).astype(int)
+            trigObjFatJetVars["TriggerObjectMatched_ak8FatJet0"] = pad_val(
+                ak.flatten(fatjet_objs["matched_ak8FatJet0"], axis=-1), num_trigobjs, axis=1
+            ).astype(int)
+            trigObjFatJetVars["TriggerObjectMatched_ak8FatJet1"] = pad_val(
+                ak.flatten(fatjet_objs["matched_ak8FatJet1"], axis=-1), num_trigobjs, axis=1
+            ).astype(int)
+            print("TrigObj vars", f"{time.time() - start:.2f}")
 
         # vbfJets
         if not self.use_scouting:
@@ -1240,7 +1234,7 @@ class bbbbSkimmer(SkimmerABC):
             **ak4JetAwayVars,
             **ak8FatJetVars,
             **bbFatJetVars,
-            **trigObjFatJetVars,
+            # **trigObjFatJetVars, 
             # Commenting out VBF jets for now, since I do not need them for the scouting analysis- Eetu 11/07/25
             # **vbfJetVars,
         }
@@ -1322,14 +1316,18 @@ class bbbbSkimmer(SkimmerABC):
             else:
                 DST_triggered = zeros
 
-            add_selection("trigger", DST_triggered, *selection_args)
+            add_selection("dst", DST_triggered, *selection_args)
 
         # metfilters
-        cut_metfilters = np.ones(len(events), dtype="bool")
-        for mf in self.met_filters:
-            if mf in events.Flag.fields:
-                cut_metfilters = cut_metfilters & events.Flag[mf]
-        apply_met_filters = True
+        if not self.use_scouting: 
+            cut_metfilters = np.ones(len(events), dtype="bool")
+            for mf in self.met_filters:
+                if mf in events.Flag.fields:
+                    cut_metfilters = cut_metfilters & events.Flag[mf]
+            apply_met_filters = True
+        else:
+            apply_met_filters = False # Drop MET filters for scouting, can't do them
+
         if self._region == "zbb-Zto2Q-DYLL":
             # in Zbb-Zto2Q-DYLL region we do not apply any met filters
             apply_met_filters = False
@@ -1358,7 +1356,7 @@ class bbbbSkimmer(SkimmerABC):
                 "0lep",
                 (ak.sum(veto_muon_sel, axis=1) == 0) & (ak.sum(veto_electron_sel, axis=1) == 0),
                 *selection_args,
-            )
+            ) # this is for pre-sel and signal so not a concern for zbb scouting
 
             if self._region == "signal":
                 # >=1 bb AK8 jets (ordered by TXbb) with TXbb > 0.8
@@ -1504,17 +1502,16 @@ class bbbbSkimmer(SkimmerABC):
                 )
 
                 # top veto: no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
-                medium_btag_th_dict = {
-                    "2022": 0.3086,
-                    "2022EE": 0.3196,
-                    "2023": 0.2431,
-                    "2023BPix": 0.2435,
+                medium_btag_th_dict = { # Commented out values are for deepFlavB
+                    # "2022": 0.3086,
+                    # "2022EE": 0.3196,
+                    # "2023": 0.2431,
+                    "2023BPix": 0.1923, # PNet medium WP using jetveto map, from https://btv-wiki.docs.cern.ch/PerformanceCalibration/ BTagPerf_240115_Summer23WPs_VetoMap.pdf
                 }
                 # no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
-                
                 cut_top_veto = (
                     ak.sum(
-                        ak4_jets_awayfromak8.btagDeepFlavB >= medium_btag_th_dict[year],
+                        ak4_jets_awayfromak8.particleNet_prob_b >= medium_btag_th_dict[year],
                         axis=1,
                     )
                     == 0
@@ -1524,8 +1521,6 @@ class bbbbSkimmer(SkimmerABC):
             else: # use scouting variables
                 # >=2 AK8 jets
                 add_selection("num_ak8jets", eventVars["nFatJets"] >= 2, *selection_args)
-                print("max",np.max(bbFatJetVars["bbFatJetPt"][:, :2]))
-                print("min",np.min(bbFatJetVars["bbFatJetPt"][:, :2]))
                 # FatJet0 with pT>250, mSD>40
                 cut_pt_lead = (
                     np.sum(
@@ -1763,7 +1758,7 @@ class bbbbSkimmer(SkimmerABC):
                     (scale_weights * weight_np[:, np.newaxis])[gen_selected], axis=0
                 )
 
-        if "HHTobbbb" in dataset or "HHto4B" in dataset or dataset.startswith(("Zto2Q", "Wto2Q")):
+        if "HHTobbbb" in dataset or "HHto4B" in dataset or dataset.startswith(("Zto2Q", "Wto2Q")): # TODO: What is this actually doing, and is this valid for just Zbb, not only ZZ4b?
             pdf_weights = get_pdf_weights(events)
             weights_dict["pdf_weights"] = pdf_weights * weights_dict["weight"][:, np.newaxis]
             totals_dict["np_pdf_weights"] = np.sum(
