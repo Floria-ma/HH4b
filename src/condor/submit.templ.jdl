@@ -6,7 +6,7 @@ when_to_transfer_output = ON_EXIT_OR_EVICT
 request_memory          = 4500
 use_x509userproxy       = true
 x509userproxy           = $proxy
-+MaxRuntime             = 14400 
++JobFlavour             = "tomorrow"
 
 output                  = $dir/logs/${prefix}_$jobid.out
 error                   = $dir/logs/${prefix}_$jobid.err
