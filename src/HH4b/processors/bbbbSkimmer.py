@@ -158,22 +158,23 @@ class bbbbSkimmer(SkimmerABC):
             "t32": "Tau3OverTau2",
             "rawFactor": "rawFactor",
         },
-        "ScoutingFatPFJetRecluster": { # This is the scouting version of the FatJet # TODO: Ensure that scouting variables switch over to these completely, no overlap
-            **P4, # TODO: We want to ignore pnet for scouting, so maybe these variables should just not be defined and we only define the scoutGlobalParT variables?
+        "ScoutingFatPFJetRecluster": {
+            **P4, 
             "msoftdrop": "Msd",
-            "ScoutParTTXbb": "ScoutParTTXbb",
-            "ScoutParTPQCD": "ScoutParTPQCD",
-            "ScoutParTPXbb": "ScoutParTPXbb",
-            "ScoutParTPXcc": "ScoutParTPXcc",
-            "ScoutParTPXcs": "ScoutParTPXcs",
-            "ScoutParTPXgg": "ScoutParTPXgg",
-            "ScoutParTPXqq": "ScoutParTPXqq",
-            "ScoutParTPXtauhtaue": "ScoutParTPXtauhtaue",
-            "ScoutParTPXtauhtauh": "ScoutParTPXtauhtauh",
-            "ScoutParTPXtauhtaum": "ScoutParTPXtauhtaum",
-            "particleNet_mass": "PNetMass", # TODO: Not sure why this is needed; please help someone
-            "scoutGlobalParT_massCorrGeneric": "ScoutParTmassGeneric",
-            "scoutGlobalParT_massCorrGenericX2p": "ScoutParTmassCorrX2p"
+            "particleNet_mass": "PNetMass",
+            # "ScoutParTTXbb": "ScoutParTTXbb", # These are extra variables so get added in extra_vars
+            # "ScoutParTPQCD": "ScoutParTPQCD",
+            # "ScoutParTPXbb": "ScoutParTPXbb",
+            # "ScoutParTPXcc": "ScoutParTPXcc",
+            # "ScoutParTPXcs": "ScoutParTPXcs",
+            # "ScoutParTPXgg": "ScoutParTPXgg",
+            # "ScoutParTPXqq": "ScoutParTPXqq",
+            # "ScoutParTPXtauhtaue": "ScoutParTPXtauhtaue",
+            # "ScoutParTPXtauhtauh": "ScoutParTPXtauhtauh",
+            # "ScoutParTPXtauhtaum": "ScoutParTPXtauhtaum",
+            # "particleNet_mass": "PNetMass", # TODO: Not sure why this is needed; please help someone
+            # "ScoutParTmassGeneric": "ScoutParTmassGeneric",
+            # "ScoutParTmassCorrX2p": "ScoutParTmassCorrX2p"
         },
         "GenHiggs": P4,
         "Event": {
@@ -705,7 +706,16 @@ class bbbbSkimmer(SkimmerABC):
             "ParT3TXbb",
             "ParT3massGeneric", 
             "ParT3massCorrX2p",
-            ] if not self.use_scouting else []
+            ] if not self.use_scouting else [
+            "ScoutParTPQCD",
+            "ScoutParTPXbb",
+            "ScoutParTPXcc",
+            "ScoutParTPXcs",
+            "ScoutParTPXqq",
+            "ScoutParTTXbb",
+            "ScoutParTmassGeneric",
+            "ScoutParTmassCorrX2p"
+            ]
 
             if self.use_scouting:
                 self.skim_vars["ScoutingFatPFJetRecluster"] = {
@@ -1196,7 +1206,7 @@ class bbbbSkimmer(SkimmerABC):
             print("TrigObj vars", f"{time.time() - start:.2f}")
 
         # vbfJets
-        if not self.use_scouting:
+        if not self.use_scouting: # TODO: Ok to remove for scouting?
             vbfJetVars = {
                 f"VBFJet{key}": pad_val(vbf_jets[var], 2, axis=1)
                 for (var, key) in self.skim_vars["Jet"].items()
@@ -1306,7 +1316,8 @@ class bbbbSkimmer(SkimmerABC):
                 axis=0,
             )
             add_selection("trigger", HLT_triggered, *selection_args)
-        if self.use_scouting:
+            
+        if apply_trigger and self.use_scouting:
             DST_list  = [events.DST[trigger] for trigger in self.DSTs[year] if trigger in events.DST.fields]
             if DST_list :
                 DST_triggered = np.any(
@@ -1704,8 +1715,9 @@ class bbbbSkimmer(SkimmerABC):
         weights = Weights(len(events), storeIndividual=True)
         weights.add("genweight", gen_weights)
 
-        add_pileup_weight(weights, year, events.Pileup.nPU.to_numpy(), dataset)
-        add_ps_weight(weights, events.PSWeight)
+        # TODO: These weights in scouting?
+        add_pileup_weight(weights, year, events.Pileup.nPU.to_numpy(), dataset) 
+        add_ps_weight(weights, events.PSWeight) 
 
         logger.debug("weights", extra=weights._weights.keys())
 

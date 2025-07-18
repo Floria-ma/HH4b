@@ -46,23 +46,23 @@ python -u -W ignore $script --year $year --starti $starti --endi $endi --samples
 
 # Move output to t2s
 for t2_prefix in ${t2_prefixes}; do
-    echo "Copying output to ${t2_prefix}/${outdir}"
+    echo "Copying output to $${t2_prefix}/${outdir}"
 
     echo "Copying pickle file..."
     xrdcp -f outfiles/* "$${t2_prefix}/${outdir}/pickles/out_${jobnum}.pkl"
-    if [ $? -ne 0 ]; then
+    if [ $$? -ne 0 ]; then
         echo "ERROR: Failed to copy pickle file to $${t2_prefix}/${outdir}/pickles" >&2
     fi
 
     echo "Copying parquet file..."
     xrdcp -f *.parquet "$${t2_prefix}/${outdir}/parquet/out_${jobnum}.parquet"
-    if [ $? -ne 0 ]; then
+    if [ $$? -ne 0 ]; then
         echo "ERROR: Failed to copy parquet file to $${t2_prefix}/${outdir}/parquet" >&2
     fi
 
     echo "Copying ROOT file..."
     xrdcp -f *.root "$${t2_prefix}/${outdir}/root/nano_skim_${jobnum}.root"
-    if [ $? -ne 0 ]; then
+    if [ $$? -ne 0 ]; then
         echo "ERROR: Failed to copy ROOT file to $${t2_prefix}/${outdir}/root" >&2
     fi
 done
