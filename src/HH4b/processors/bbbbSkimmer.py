@@ -1523,7 +1523,7 @@ class bbbbSkimmer(SkimmerABC):
                 # no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
                 cut_top_veto = (
                     ak.sum(
-                        ak4_jets_awayfromak8.DeepFlavB >= medium_btag_th_dict[year], # deepflavb what was the variable name?
+                        ak4_jets_awayfromak8.btagDeepFlavB >= medium_btag_th_dict[year], # deepflavb what was the variable name?
                         axis=1,
                     )
                     == 0
