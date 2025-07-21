@@ -706,7 +706,6 @@ class bbbbSkimmer(SkimmerABC):
             "ParT3TXbb",
             "ParT3massGeneric", 
             "ParT3massCorrX2p",
-            "ParT3massCorrW2p"
             ] if not self.use_scouting else [
             "ScoutParTPQCD",
             "ScoutParTPXbb",
@@ -715,7 +714,7 @@ class bbbbSkimmer(SkimmerABC):
             "ScoutParTPXqq",
             "ScoutParTTXbb",
             "ScoutParTmassGeneric",
-            "ScoutParTmassCorrX2p"
+            "ScoutParTmassCorrX2p",
             "ScoutParTmassCorrW2p"
             ]
 

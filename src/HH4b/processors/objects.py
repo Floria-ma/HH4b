@@ -432,9 +432,6 @@ def get_ak8jets(fatjets: FatJetArray): # TODO: This is the goldmine for the vari
         fatjets["ParT3massCorrX2p"] = (
             fatjets.globalParT3_massCorrX2p * (1 - fatjets.rawFactor) * fatjets.mass
         )
-        fatjets["ParT3massCorrW2p"] = (
-            fatjets.globalParT3_massCorrW2p * (1 - fatjets.rawFactor) * fatjets.mass
-        )
 
     if "scoutGlobalParT_prob_Xbb" in fatjets_fields: # This could be an elif since it is mutually exclusive with globalParT3_Xbb; and other taggers
         fatjets["ScoutParTPQCD"] = fatjets.scoutGlobalParT_prob_QCD
