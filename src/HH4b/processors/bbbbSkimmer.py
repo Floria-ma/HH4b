@@ -1512,17 +1512,17 @@ class bbbbSkimmer(SkimmerABC):
                     *selection_args,
                 )
 
-                # top veto: no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
-                medium_btag_th_dict = { # Commented out values are for deepFlavB
-                    # "2022": 0.3086,
-                    # "2022EE": 0.3196,
-                    # "2023": 0.2431,
-                    "2023BPix": 0.1923, # PNet medium WP using jetveto map, from https://btv-wiki.docs.cern.ch/PerformanceCalibration/ BTagPerf_240115_Summer23WPs_VetoMap.pdf
+               # top veto: no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
+                medium_btag_th_dict = {
+                    "2022": 0.3086,
+                    "2022EE": 0.3196,
+                    "2023": 0.2431,
+                    "2023BPix": 0.2435,
                 }
                 # no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
                 cut_top_veto = (
                     ak.sum(
-                        ak4_jets_awayfromak8.particleNet_prob_b >= medium_btag_th_dict[year],
+                        ak4_jets_awayfromak8.DeepFlavB >= medium_btag_th_dict[year], # deepflavb what was the variable name?
                         axis=1,
                     )
                     == 0
@@ -1540,7 +1540,7 @@ class bbbbSkimmer(SkimmerABC):
                         axis=1,
                     )
                 ) >= 1
-                add_selection("ak8_ptmSD_lead", cut_pt_lead, *selection_args)
+                add_selection("ak8_ptmSD_lead", cut_pt_lead, *selection_args) # Includes a cut on leading pt as well
 
                 # FatJet1 with pT>200
                 cut_pt_subl = (
@@ -1562,23 +1562,11 @@ class bbbbSkimmer(SkimmerABC):
                 add_selection("ak8_back2back", zbb_ak8jets_dphi >= (np.pi / 2), *selection_args)
 
                 # >= 1 AK8 jet with ParT/PNet Xbb >= 0.1
-                if self._nano_version.startswith("v14"):
-                    # ParT2 and ParT3 in v14
-                    cut_txbb = (
-                        (np.sum(bbFatJetVars["bbFatJetParT2TXbb"][:, :2] >= 0.1, axis=1) >= 1)
-                        | (np.sum(bbFatJetVars["bbFatJetParT3TXbb"][:, :2] >= 0.1, axis=1) >= 1)
-                        | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1)
-                    )
-                if self._nano_version.startswith("v15"):
-                    # ParT3 in v15
-                    cut_txbb = (
-                        (np.sum(bbFatJetVars["bbFatJetScoutParTTXbb"][:, :2] >= 0.1, axis=1) >= 1)
-                        # | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1) # TODO: Ask Patin if this is needed
-                    )
-                else:
-                    cut_txbb = (np.sum(bbFatJetVars["bbFatJetParTTXbb"][:, :2] >= 0.1, axis=1) >= 1) | (
-                        np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1
-                    )
+                cut_txbb = (
+                    (np.sum(bbFatJetVars["bbFatJetScoutParTTXbb"][:, :2] >= 0.1, axis=1) >= 1)
+                    # | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1) # TODO: Ask Patin if this is needed
+                )
+               
                 add_selection("ak8bb_txbb", cut_txbb, *selection_args)
 
                 # HT > 1000
@@ -1594,11 +1582,11 @@ class bbbbSkimmer(SkimmerABC):
                 # Commenting out 0lep because electrons not well defined in scouting, but muons would be so consider changing back at some point - Eetu 11/07/25
 
                 # top veto: no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
-                medium_btag_th_dict = {
-                    "2022": 0.3086,
-                    "2022EE": 0.3196,
-                    "2023": 0.2431,
-                    "2023BPix": 0.2435,
+                medium_btag_th_dict = { # Commented out values are for deepFlavB
+                    # "2022": 0.3086,
+                    # "2022EE": 0.3196,
+                    # "2023": 0.2431,
+                    "2023BPix": 0.1923, # PNet medium WP using jetveto map, from https://btv-wiki.docs.cern.ch/PerformanceCalibration/ BTagPerf_240115_Summer23WPs_VetoMap.pdf
                 }
                 # no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
                 cut_top_veto = (
