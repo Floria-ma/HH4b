@@ -117,7 +117,7 @@ def add_pileup_weight(weights: Weights, year: str, nPU: np.ndarray, dataset: str
         values["up"] = np.clip(cset[corr].evaluate(nPU, "up"), 0, 10)
         values["down"] = np.clip(cset[corr].evaluate(nPU, "down"), 0, 10)
 
-        weights.add("pileup", values["nominal"], values["up"], values["down"])
+        weights.add("pileup", values["nominal"])#, values["up"], values["down"])  # fuck uncertainties #scouting
 
 
 def get_vpt(genpart, check_offshell=False):

@@ -568,10 +568,11 @@ class bbbbSkimmer(SkimmerABC):
         #     ]
         if self._nano_version == "v15_scouting": # TODO: What variables to put here? @Patin @Santeri
             if self.use_scouting:
-                self.jmsr_vars += [
-                    "scoutGlobalParT_massCorrGeneric",
-                    "scoutGlobalParT_massCorrGenericX2p", 
-                ]
+                # self.jmsr_vars += [
+                #     # "scoutGlobalParT_massCorrGeneric",
+                #     # "scoutGlobalParT_massCorrGenericX2p", 
+                # ]
+                pass
             else:
                 self.jmsr_vars += [
                     "ParT3massGeneric",
@@ -1523,7 +1524,7 @@ class bbbbSkimmer(SkimmerABC):
                 # no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
                 cut_top_veto = (
                     ak.sum(
-                        ak4_jets_awayfromak8.btagDeepFlavB >= medium_btag_th_dict[year], # deepflavb what was the variable name?
+                        ak4_jets_awayfromak8.btagDeepFlavB >= medium_btag_th_dict[year],
                         axis=1,
                     )
                     == 0
@@ -1704,7 +1705,6 @@ class bbbbSkimmer(SkimmerABC):
         weights = Weights(len(events), storeIndividual=True)
         weights.add("genweight", gen_weights)
 
-        # TODO: These weights in scouting?
         add_pileup_weight(weights, year, events.Pileup.nPU.to_numpy(), dataset) 
         add_ps_weight(weights, events.PSWeight) 
 
@@ -1748,7 +1748,7 @@ class bbbbSkimmer(SkimmerABC):
         for key in weights._weights:
             weights_dict[f"single_weight_{key}"] = weights.partial_weight([key])
 
-        ###################### alpha_S and PDF variations ######################
+        ###################### alpha_S and PDF variations ######################  # TODO: ""These are only needed if we do variations" - Fikri" - Patin
         if ("HHTobbbb" in dataset or "HHto4B" in dataset) or dataset.startswith("TTto"):
             scale_weights = get_scale_weights(events)
             if scale_weights is not None:
@@ -1759,7 +1759,7 @@ class bbbbSkimmer(SkimmerABC):
                     (scale_weights * weight_np[:, np.newaxis])[gen_selected], axis=0
                 )
 
-        if "HHTobbbb" in dataset or "HHto4B" in dataset or dataset.startswith(("Zto2Q", "Wto2Q")): # TODO: What is this actually doing, and is this valid for just Zbb, not only ZZ4b?
+        if "HHTobbbb" in dataset or "HHto4B" in dataset or dataset.startswith(("Zto2Q", "Wto2Q")):
             pdf_weights = get_pdf_weights(events)
             weights_dict["pdf_weights"] = pdf_weights * weights_dict["weight"][:, np.newaxis]
             totals_dict["np_pdf_weights"] = np.sum(
