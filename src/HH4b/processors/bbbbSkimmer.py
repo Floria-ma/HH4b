@@ -216,6 +216,13 @@ class bbbbSkimmer(SkimmerABC):
         "mreg": 0,
     }
 
+    zbb_fatjet_scouting_selection = {  
+        "pt": 150, # lower pt bound to 150 for scouting fatjet
+        "eta": 2.4,
+        "msd": 0,
+        "mreg": 0,
+    }
+
     vbf_jet_selection = {  # noqa: RUF012
         "pt": 25,
         "eta_max": 4.7,
@@ -281,7 +288,11 @@ class bbbbSkimmer(SkimmerABC):
         # DST selection (scouting only)
         DSTs = {
             "zbb": {
-                "2023BPix": ["Run3_JetHT_PFScoutingPixelTracking",
+                "2023BPix": [
+                    "Run3_JetHT_PFScoutingPixelTracking",
+                ],
+                "2024": [
+                    "Run3_JetHT_PFScoutingPixelTracking", # Should this be changed?
                 ],
             }
         }
@@ -579,7 +590,7 @@ class bbbbSkimmer(SkimmerABC):
                     "ParT3massCorrX2p", 
                 ]
         
-        self.jms_values = dict.fromkeys(["2022", "2022EE", "2023", "2023BPix"])
+        self.jms_values = dict.fromkeys(["2022", "2022EE", "2023", "2023BPix"]) # TODO: If we are not doing JECs for scouting, does one need to worry about this?
         self.jmr_values = dict.fromkeys(["2022", "2022EE", "2023", "2023BPix"])
         for jmsr_year in self.jms_values:
             jmr_val = HH4b.hh_vars.jmsr_values["bbFatJetParTmassVis"]["JMR"][jmsr_year]
@@ -749,7 +760,7 @@ class bbbbSkimmer(SkimmerABC):
         print("# events", len(events))
 
         year = events.metadata["dataset"].split("_")[0]
-        is_run3 = year in ["2022", "2022EE", "2023", "2023BPix"]
+        is_run3 = year in ["2022", "2022EE", "2023", "2023BPix", "2024"]
         dataset = "_".join(events.metadata["dataset"].split("_")[1:])
         isData = not hasattr(events, "genWeight")
 
@@ -893,6 +904,8 @@ class bbbbSkimmer(SkimmerABC):
         if self._region in ("zbb", "zbb-DYLL-data", "zbb-Zto2Q-DYLL"):
             fatjets = good_ak8jets(
                 fatjets, **self.zbb_fatjet_selection, nano_version=self._nano_version, use_scouting=self.use_scouting
+            ) if not self.use_scouting else good_ak8jets(
+                fatjets, **self.zbb_fatjet_scouting_selection, nano_version=self._nano_version, use_scouting=self.use_scouting
             )
         else:
             fatjets = good_ak8jets(
@@ -1589,6 +1602,7 @@ class bbbbSkimmer(SkimmerABC):
                     # "2022EE": 0.3196,
                     # "2023": 0.2431,
                     "2023BPix": 0.1923, # PNet medium WP using jetveto map, from https://btv-wiki.docs.cern.ch/PerformanceCalibration/ BTagPerf_240115_Summer23WPs_VetoMap.pdf
+                    "2024": 0.1923, # TODO: Do working points exist? Will continue using 2023BPix one
                 }
                 # no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
                 cut_top_veto = (
