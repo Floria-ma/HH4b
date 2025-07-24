@@ -717,7 +717,8 @@ class bbbbSkimmer(SkimmerABC):
             "ParT3PXqq",
             "ParT3TXbb",
             "ParT3massGeneric", 
-            "ParT3massCorrX2p",
+            "ParT3massCorrectedX2p",
+            "ParT3massCorrFactorX2p",
             ] if not self.use_scouting else [
             "ScoutParTPQCD",
             "ScoutParTPXbb",
@@ -726,8 +727,10 @@ class bbbbSkimmer(SkimmerABC):
             "ScoutParTPXqq",
             "ScoutParTTXbb",
             "ScoutParTmassGeneric",
-            "ScoutParTmassCorrX2p",
-            "ScoutParTmassCorrW2p"
+            "ScoutParTmassCorrectedX2p",
+            "ScoutParTmassCorrectedW2p"
+            "ScoutParTmassCorrFactorX2p",
+            "ScoutParTmassCorrFactorW2p"
             ]
 
             if self.use_scouting:
@@ -760,7 +763,7 @@ class bbbbSkimmer(SkimmerABC):
         print("# events", len(events))
 
         year = events.metadata["dataset"].split("_")[0]
-        is_run3 = year in ["2022", "2022EE", "2023", "2023BPix", "2024"]
+        is_run3 = year in ["2022", "2022EE", "2023", "2023BPix", "2024"] # 2024 needs separate handling? TODO: Not implemented yet.
         dataset = "_".join(events.metadata["dataset"].split("_")[1:])
         isData = not hasattr(events, "genWeight")
 
@@ -845,7 +848,7 @@ class bbbbSkimmer(SkimmerABC):
             if self.use_scouting:
                 if hasattr(events, "ScoutingMET"):
                     events_met = events.ScoutingMET 
-                elif hasattr(events, "PuppiMET"):
+                elif hasattr(events, "PuppiMET"): # Scouting doesn't have PuppiMET? Discuss this part with Patin
                     events_met = events.PuppiMET # TODO: What is this and does this work for scouting?
                     deltaX_up = events_met.ptUnclusteredUp * np.cos(events_met.phiUnclusteredUp)
                     deltaY_up = events_met.ptUnclusteredUp * np.sin(events_met.phiUnclusteredUp)
@@ -856,7 +859,7 @@ class bbbbSkimmer(SkimmerABC):
                 else:
                     raise AttributeError("Neither 'ScoutingMET' nor 'PuppiMET' attribute found in events.")
 
-            met = JEC_loader.met_factory.build(events_met, jets, {}) if isData and not self.use_scouting else events_met # TODO: Can we abandon JECs for scouting? A: Yes pretty much
+            met = JEC_loader.met_factory.build(events_met, jets, {}) if isData and not self.use_scouting else events_met # TODO: Can we abandon JECs for scouting? A: Yes pretty much. A2: Probably not? Currently notice significant mass bias and suspect that this is due to lack of JECs
         else:
             if hasattr(events, "MET"):
                 met = events.MET if not self.use_scouting else events.ScoutingMET
@@ -912,7 +915,7 @@ class bbbbSkimmer(SkimmerABC):
                 fatjets, **self.fatjet_selection, nano_version=self._nano_version, use_scouting=self.use_scouting
             )
 
-        if self._region in ("zbb-DYLL-data", "zbb-Zto2Q-DYLL"):
+        if self._region in ("zbb-DYLL-data", "zbb-Zto2Q-DYLL"): # TODO: These corrections in scouting? Can be derived from non-scouting data, just xsec corrections?
             # no need for fatjets
             fatjets_xbb = fatjets
         else:
