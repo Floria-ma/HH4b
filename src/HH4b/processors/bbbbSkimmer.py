@@ -728,9 +728,9 @@ class bbbbSkimmer(SkimmerABC):
             "ScoutParTTXbb",
             "ScoutParTmassGeneric",
             "ScoutParTmassCorrectedX2p",
-            "ScoutParTmassCorrectedW2p"
+            "ScoutParTmassCorrectedW2p",
             "ScoutParTmassCorrFactorX2p",
-            "ScoutParTmassCorrFactorW2p"
+            "ScoutParTmassCorrFactorW2p",
             ]
 
             if self.use_scouting:
