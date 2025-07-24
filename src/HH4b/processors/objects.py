@@ -429,7 +429,8 @@ def get_ak8jets(fatjets: FatJetArray): # TODO: This is the goldmine for the vari
         fatjets["ParT3massGeneric"] = (
             fatjets.globalParT3_massCorrGeneric * (1 - fatjets.rawFactor) * fatjets.mass
         )
-        fatjets["ParT3massCorrX2p"] = (
+        fatjets["ParT3massCorrFactorX2p"] = fatjets.globalParT3_massCorrX2p 
+        fatjets["ParT3massCorrectedX2p"] = (
             fatjets.globalParT3_massCorrX2p * (1 - fatjets.rawFactor) * fatjets.mass
         )
 
@@ -459,17 +460,20 @@ def get_ak8jets(fatjets: FatJetArray): # TODO: This is the goldmine for the vari
             )
         )
 
+        # Correction factors because Patin requested to see them - 24/07/2025
+        fatjets["ScoutParTmassCorrFactorX2p"] = fatjets.scoutGlobalParT_massCorrGenericX2p 
+        fatjets["ScoutParTmassCorrFactorW2p"] = fatjets.scoutGlobalParT_massCorrGenericW2p
+
+        # Regression masses + corrected regression masses
         fatjets["ScoutParTmassGeneric"] = (
             fatjets.scoutGlobalParT_massCorrGeneric * fatjets.mass
         )
-        fatjets["ScoutParTmassCorrX2p"] = (
+        fatjets["ScoutParTmassCorrectedX2p"] = (
             fatjets.scoutGlobalParT_massCorrGenericX2p * fatjets.mass
         )
-        fatjets["ScoutParTmassCorrW2p"] = (
+        fatjets["ScoutParTmassCorrectedW2p"] = (
             fatjets.scoutGlobalParT_massCorrGenericW2p * fatjets.mass
         )
-
-        # TODO: What is going on here with the mass regression; why are we doing this? Why are we not defining the scoutGlobalParT_massCorrGeneric and scoutGlobalParT_massCorrGenericW2p variables also?
 
     return fatjets
 
