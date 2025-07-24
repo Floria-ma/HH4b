@@ -224,6 +224,7 @@ xsecs["Wto2Q-2Jets_PTQQ-400to600_1J"] = 3.496
 xsecs["Wto2Q-2Jets_PTQQ-400to600_2J"] = 12.75
 xsecs["Wto2Q-2Jets_PTQQ-600_1J"] = 0.4221
 xsecs["Wto2Q-2Jets_PTQQ-600_2J"] = 2.128
+
 xsecs["Zto2Q-2Jets_PTQQ-100to200_1J"] = 302.0
 xsecs["Zto2Q-2Jets_PTQQ-100to200_2J"] = 343.9
 xsecs["Zto2Q-2Jets_PTQQ-200to400_1J"] = 21.64
@@ -232,6 +233,16 @@ xsecs["Zto2Q-2Jets_PTQQ-400to600_1J"] = 0.7376
 xsecs["Zto2Q-2Jets_PTQQ-400to600_2J"] = 2.683
 xsecs["Zto2Q-2Jets_PTQQ-600_1J"] = 0.08717
 xsecs["Zto2Q-2Jets_PTQQ-600_2J"] = 0.4459
+
+# Same samples as above but just with the full name
+xsecs["Zto2Q-2Jets_PTQQ-100to200_1J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8"] = 302.0
+xsecs["Zto2Q-2Jets_PTQQ-100to200_2J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8"] = 343.9
+xsecs["Zto2Q-2Jets_PTQQ-200to400_1J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8"] = 21.64
+xsecs["Zto2Q-2Jets_PTQQ-200to400_2J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8"] = 48.36
+xsecs["Zto2Q-2Jets_PTQQ-400to600_1J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8"] = 0.7376
+xsecs["Zto2Q-2Jets_PTQQ-400to600_2J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8"] = 2.683
+xsecs["Zto2Q-2Jets_PTQQ-600_1J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8"] = 0.08717
+xsecs["Zto2Q-2Jets_PTQQ-600_2J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8"] = 0.4459
 
 xsecs["WtoLNu-4Jets"] = 55390.0
 xsecs["WtoLNu-2Jets"] = 64481.58

@@ -762,9 +762,11 @@ class bbbbSkimmer(SkimmerABC):
         print("Starting")
         print("# events", len(events))
 
+        events.metadata["dataset"] = "2023BPix_Zto2Q-2Jets_PTQQ-600_2J_TuneCP5_13p6TeV_amcatnloFXFX-pythia8"
         year = events.metadata["dataset"].split("_")[0]
         is_run3 = year in ["2022", "2022EE", "2023", "2023BPix", "2024"] # 2024 needs separate handling? TODO: Not implemented yet.
         dataset = "_".join(events.metadata["dataset"].split("_")[1:])
+        print("events.metadata['dataset']:", events.metadata["dataset"])
         isData = not hasattr(events, "genWeight")
 
         # datasets for saving jec variations
