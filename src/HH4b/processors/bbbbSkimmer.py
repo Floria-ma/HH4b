@@ -875,6 +875,8 @@ class bbbbSkimmer(SkimmerABC):
 
         if self._region == "semiboosted":
             jets_sel = (jets.pt > 30) & (abs(jets.eta) < 2.5)
+        elif self._region == "zbb":
+            jets_sel = (jets.pt > 15) & (abs(jets.eta) < 2.2)
         else:
             jets_sel = (jets.pt > 15) & (abs(jets.eta) < 4.7)
 
