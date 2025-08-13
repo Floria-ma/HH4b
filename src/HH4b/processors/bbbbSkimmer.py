@@ -598,6 +598,19 @@ class bbbbSkimmer(SkimmerABC):
         for jmsr_year in self.jms_values:
             jmr_val = HH4b.hh_vars.jmsr_values["bbFatJetParTmassVis"]["JMR"][jmsr_year] # TODO: Wtf is this jmsr values dictionary
             jms_val = HH4b.hh_vars.jmsr_values["bbFatJetParTmassVis"]["JMS"][jmsr_year]
+
+            if self.use_scouting and self._nano_version == "v15_scouting":
+                # jmr_val = { # Santeri said do this in "Eetu's summer project" at 2:51PM on 13/08/2025
+                #     "2023": {"nom": 1.0, "down": 0.9, "up": 1.1},
+                #     "2023BPix": {"nom": 1.0, "down": 0.9, "up": 1.1}
+                # }[jmsr_year]
+                # jms_val = {
+                #     "2023": {"nom": 1.0, "down": 0.9, "up": 1.1},
+                #     "2023BPix": {"nom": 1.0, "down": 0.9, "up": 1.1}
+                # }[jmsr_year]
+                jmr_val = {"nom": 1.0, "down": 0.9, "up": 1.1}
+                jms_val = {"nom": 1.0, "down": 0.9, "up": 1.1}
+
             self.jmr_values[jmsr_year] = dict.fromkeys(self.jmsr_vars)
             self.jms_values[jmsr_year] = dict.fromkeys(self.jmsr_vars)
             # default no scaling/smearing
@@ -626,29 +639,29 @@ class bbbbSkimmer(SkimmerABC):
                     jms_val["down"],
                     jms_val["up"],
                 ]
-            # if self._nano_version == "v15_scouting": # Are the bbFatJetParTmassVis values valid for scouting??
-            #     if self.use_scouting:
-            #         self.jmr_values[jmsr_year]["ScoutParTmassGeneric"] = [
-            #             jmr_val["nom"],
-            #             jmr_val["down"],
-            #             jmr_val["up"],
-            #         ]
-            #         self.jmr_values[jmsr_year]["ScoutParTmassCorrectedX2p"] = [
-            #             jmr_val["nom"],
-            #             jmr_val["down"],
-            #             jmr_val["up"],
-            #         ]
-            #     else: # haven't tested
-            #         self.jmr_values[jmsr_year]["ParT3massGeneric"] = [
-            #             jmr_val["nom"],
-            #             jmr_val["down"],
-            #             jmr_val["up"],
-            #         ]
-            #         self.jmr_values[jmsr_year]["ParT3massCorrectedX2p"] = [
-            #             jmr_val["nom"],
-            #             jmr_val["down"],
-            #             jmr_val["up"],
-            #         ]
+            if self._nano_version == "v15_scouting": # Are the bbFatJetParTmassVis values valid for scouting??
+                if self.use_scouting:
+                    self.jmr_values[jmsr_year]["ScoutParTmassGeneric"] = [
+                        jmr_val["nom"],
+                        jmr_val["down"],
+                        jmr_val["up"],
+                    ]
+                    self.jmr_values[jmsr_year]["ScoutParTmassCorrectedX2p"] = [
+                        jmr_val["nom"],
+                        jmr_val["down"],
+                        jmr_val["up"],
+                    ]
+                else: # haven't tested
+                    self.jmr_values[jmsr_year]["ParT3massGeneric"] = [
+                        jmr_val["nom"],
+                        jmr_val["down"],
+                        jmr_val["up"],
+                    ]
+                    self.jmr_values[jmsr_year]["ParT3massCorrectedX2p"] = [
+                        jmr_val["nom"],
+                        jmr_val["down"],
+                        jmr_val["up"],
+                    ]
 
 
         # FatJet Vars
@@ -849,7 +862,7 @@ class bbbbSkimmer(SkimmerABC):
             events.Jet if not self.use_scouting else events.ScoutingPFJetRecluster, # If we use scouting we use ScoutingPFJetRecluster
             year,
             isData,
-            jecs=self.jecs if not self.use_scouting else None, # No variations for scouting rn
+            jecs=self.jecs, # if not self.use_scouting else None, # No variations for scouting rn
             fatjets=False,
             applyData=True, # Apply corrections to data
             dataset=dataset,
@@ -857,7 +870,7 @@ class bbbbSkimmer(SkimmerABC):
             use_scouting=self.use_scouting,
         )  
 
-        if JEC_loader.met_factory is not None:
+        if JEC_loader.met_factory is not None: # TODO: This whole MET business is a mess to me. Figure it out?
             # check if "MET" attribute exists
             if not self.use_scouting:
                 if hasattr(events, "MET"):
@@ -925,7 +938,7 @@ class bbbbSkimmer(SkimmerABC):
             fatjets,
             year,
             isData,
-            jecs=self.jecs if not self.use_scouting else None, # no variations for scouting rn
+            jecs=self.jecs,# if not self.use_scouting else None, # no variations for scouting rn
             fatjets=True,
             applyData=True,
             dataset=dataset,
@@ -1385,7 +1398,7 @@ class bbbbSkimmer(SkimmerABC):
                     cut_metfilters = cut_metfilters & events.Flag[mf]
             apply_met_filters = True
         else:
-            apply_met_filters = False # Drop MET filters for scouting, can't do them
+            apply_met_filters = False # Drop MET filters for scouting, can't do them (earlier). - Really, (Now)? - Eetu 13/08
 
         if self._region == "zbb-Zto2Q-DYLL":
             # in Zbb-Zto2Q-DYLL region we do not apply any met filters
