@@ -288,6 +288,9 @@ class bbbbSkimmer(SkimmerABC):
         # DST selection (scouting only)
         DSTs = {
             "zbb": {
+                "2023": [
+                    "Run3_JetHT_PFScoutingPixelTracking",
+                ],
                 "2023BPix": [
                     "Run3_JetHT_PFScoutingPixelTracking",
                 ],
@@ -901,7 +904,7 @@ class bbbbSkimmer(SkimmerABC):
         if self._region == "semiboosted":
             jets_sel = (jets.pt > 30) & (abs(jets.eta) < 2.5)
         elif self._region == "zbb":
-            jets_sel = (jets.pt > 15) & (abs(jets.eta) < 2.2) # 
+            jets_sel = (jets.pt > 15) & (abs(jets.eta) < 2.2) 
         else:
             jets_sel = (jets.pt > 15) & (abs(jets.eta) < 4.7)
 
@@ -1575,7 +1578,7 @@ class bbbbSkimmer(SkimmerABC):
                 add_selection("top_veto", cut_top_veto, *selection_args)
 
             else: # use scouting variables
-                # >=2 AK8 jets
+                # >=1 AK8 jets
                 add_selection("num_ak8jets", eventVars["nFatJets"] >= 1, *selection_args)
                 # FatJet0 with pT>250, mSD>40
                 cut_pt_lead = (
