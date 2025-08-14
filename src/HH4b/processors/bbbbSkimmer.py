@@ -1357,9 +1357,10 @@ class bbbbSkimmer(SkimmerABC):
         ######################
 
         # OR-ing HLT triggers
-        for trigger in self.HLTs[year]:
-            if trigger not in events.HLT.fields:
-                logger.warning(f"Missing HLT {trigger}!")
+        if not self.use_scouting:
+            for trigger in self.HLTs[year]:
+                if trigger not in events.HLT.fields:
+                    logger.warning(f"Missing HLT {trigger}!")
 
         # apply trigger
         apply_trigger = True
@@ -1647,7 +1648,7 @@ class bbbbSkimmer(SkimmerABC):
                 medium_btag_th_dict = { # Commented out values are for deepFlavB
                     # "2022": 0.3086,
                     # "2022EE": 0.3196,
-                    # "2023": 0.2431,
+                    "2023": 0.1918, # Same as below
                     "2023BPix": 0.1923, # PNet medium WP using jetveto map, from https://btv-wiki.docs.cern.ch/PerformanceCalibration/ BTagPerf_240115_Summer23WPs_VetoMap.pdf
                     "2024": 0.1923, # TODO: Do working points exist? Will continue using 2023BPix one
                 }
