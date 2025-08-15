@@ -682,10 +682,13 @@ def get_templates(
             jshift=jshift,
         )
 
+        cutflow_dir = Path(template_dir) / "cutflows" / year
+        cutflow_dir.mkdir(parents=True, exist_ok=True) 
+
         if template_dir != "":
             cf = cf.round(2)
             print("cutflow ", rname, cf)
-            cf.to_csv(f"{template_dir}/cutflows/{year}/{rname}_cutflow{jlabel}.csv")
+            cf.to_csv(cutflow_dir / f"{rname}_cutflow{jlabel}.csv")
 
         sig_events = {}
         for sig_key in sig_keys:
