@@ -12,8 +12,14 @@ import warnings
 from math import ceil
 from pathlib import Path
 from string import Template
+import subprocess
 
 from HH4b import run_utils
+
+from concurrent.futures import ThreadPoolExecutor
+
+def condor_submit(jdl):
+    subprocess.run(["condor_submit", jdl], check=True)
 
 t2_redirectors = {
     "lpc": "root://cmseos.fnal.gov//",
@@ -94,10 +100,15 @@ def main(args):
 
     # submit jobs
     nsubmit = 0
+    submissions = []
+
     for sample in fileset:
         for subsample, tot_files in fileset[sample].items():
             if args.submit:
                 print("Submitting " + subsample)
+
+            subsample_dir = local_dir / subsample
+            subsample_dir.mkdir(parents=True, exist_ok=True)
 
             sample_dir = outdir / args.year / subsample
             njobs = ceil(tot_files / args.files_per_job)
@@ -107,11 +118,11 @@ def main(args):
                     break
 
                 prefix = f"{args.year}_{subsample}"
-                localcondor = f"{local_dir}/{prefix}_{j}.jdl"
-                jdl_args = {"dir": local_dir, "prefix": prefix, "jobid": j, "proxy": proxy}
+                localcondor = subsample_dir / f"{prefix}_{j}.jdl"
+                jdl_args = {"dir": subsample_dir, "prefix": prefix, "jobid": j, "proxy": proxy}
                 write_template(jdl_templ, localcondor, jdl_args)
 
-                localsh = f"{local_dir}/{prefix}_{j}.sh"
+                localsh = subsample_dir / f"{prefix}_{j}.sh"
                 sh_args = {
                     "branch": args.git_branch,
                     "gituser": args.git_user,
@@ -145,10 +156,17 @@ def main(args):
                     Path(f"{localcondor}.log").unlink()
 
                 if args.submit:
-                    os.system(f"condor_submit {localcondor}")
+                    submissions.append(str(localcondor))
+                    # os.system(f"condor_submit {localcondor}")
                 else:
                     print("To submit ", localcondor)
                 nsubmit = nsubmit + 1
+
+    if args.submit and submissions:
+        print(f"Submitting {len(submissions)} jobs in parallel...")
+
+        with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+            executor.map(condor_submit, submissions)
 
     print(f"Total {nsubmit} jobs")
 
