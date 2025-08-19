@@ -116,8 +116,8 @@ def add_pileup_weight(weights: Weights, year: str, nPU: np.ndarray, dataset: str
         values["nominal"] = np.clip(cset[corr].evaluate(nPU, "nominal"), 0, 10)
         values["up"] = np.clip(cset[corr].evaluate(nPU, "up"), 0, 10)
         values["down"] = np.clip(cset[corr].evaluate(nPU, "down"), 0, 10)
-
-        weights.add("pileup", values["nominal"])#, values["up"], values["down"])  # fuck uncertainties #scouting
+        print("Adding pileup weights, up down nom")
+        weights.add("pileup", values["nominal"], values["up"], values["down"])
 
 
 def get_vpt(genpart, check_offshell=False):
@@ -291,10 +291,15 @@ class JECs:
         jets = self._add_jec_variables(jets, rho, isData, use_scouting=use_scouting)
 
         apply_jecs = ak.any(jets.pt) if (applyData or not isData) else False
-        if "v12" not in nano_version or "v15_scouting" not in nano_version: 
+        print("applyjecs: ", apply_jecs)
+
+        if not ("v12" in nano_version or "v15_scouting" in nano_version):
             apply_jecs = False
+    
         if not apply_jecs:
             return jets, None
+
+        print("applyjecs: ", apply_jecs)
 
         jec_vars = ["pt"]  # variables we are saving that are affected by JECs
         jet_factory_str = "ak4"
@@ -330,9 +335,10 @@ class JECs:
             corr_key = f"{year}mc"
 
         # fatjet_factory.build gives an error if there are no jets in event
-        if apply_jecs:
+        if apply_jecs:  
             jets = self.jet_factory[jet_factory_str][corr_key].build(jets, jec_cache)
 
+        print("Made it to before shifts")
         # return only jets if no variations are given
         if jecs is None or isData:
             return jets, None
@@ -347,6 +353,8 @@ class JECs:
                             tdict[f"{key}_{var}"] = jets[shift][var][jec_var]
             jec_shifted_vars[jec_var] = tdict
 
+        print("HERE COME THE JEC SHIFTED VARS!!!!!!!!!!!!!!!!!!")
+        print(jec_shifted_vars)
         return jets, jec_shifted_vars
 
 

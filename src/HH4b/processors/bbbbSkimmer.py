@@ -917,7 +917,7 @@ class bbbbSkimmer(SkimmerABC):
         if self._region == "semiboosted":
             jets_sel = (jets.pt > 30) & (abs(jets.eta) < 2.5)
         elif self._region == "zbb":
-            jets_sel = (jets.pt > 15) & (abs(jets.eta) < 2.2) 
+            jets_sel = (jets.pt > 15) & (abs(jets.eta) < 2.4) 
         else:
             jets_sel = (jets.pt > 15) & (abs(jets.eta) < 4.7)
 
@@ -1178,8 +1178,9 @@ class bbbbSkimmer(SkimmerABC):
             pileupVars = {key: np.ones(len(events)) * PAD_VAL for key in self.skim_vars["Pileup"]}
         else:
             pileupVars = {key: events.Pileup[key].to_numpy() for key in self.skim_vars["Pileup"]}
-        pileupVars = {**pileupVars, "nPV": events.PV["npvs"].to_numpy()} if not self.use_scouting else {**pileupVars, "nPV": ak.num(events.ScoutingPrimaryVertex, axis = 1).to_numpy()} # TODO: Check if axis = 1 is the correct one to use
 
+        pileupVars = {**pileupVars, "nPV": events.PV["npvs"].to_numpy()} if not self.use_scouting else {**pileupVars, "nPV": ak.num(events.ScoutingPrimaryVertex, axis = 1).to_numpy()} # TODO: Check if axis = 1 is the correct one to use
+        
         # Trigger variables
         HLTs = deepcopy(self.HLTs[year])
         # We should not use != "signal" as a condition, it is hard to understand which skimmer needs this. - Raghav
