@@ -16,6 +16,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 import os
+import pyarrow.parquet as pq
 
 import hist
 import numpy as np
@@ -324,6 +325,7 @@ def load_samples(
 
     data_dir = Path(data_dir) / year
     full_samples_list = os.listdir(data_dir)
+    print(full_samples_list)
 
     for label, selector in samples.items():
         load_columns = columns
@@ -345,12 +347,18 @@ def load_samples(
 
             try:
                 non_empty_passed_list = []
-                for parquet_file in parquet_path.glob("*.parquet"):
+                for parquet_file in parquet_path.glob("[!.]*.parquet"): # I sometimes got system files which we don't want, e.g. ".sys.v#.out_1863.parquet" so I filter them out with the [!.] part
                     try:
+                        meta = pq.ParquetFile(parquet_file).metadata
+                        if meta.num_rows == 0:
+                            # empty file, skip
+                            continue
+
                         df_sample = pd.read_parquet(parquet_file, filters=filters, columns=load_columns)
-                        if not df_sample.empty:
+                        if not df_sample.empty: # In case filters get rid of all rows
                             non_empty_passed_list.append(df_sample)
-                    except Exception:
+                    except Exception as e:
+                        warnings.warn(f"Error when reading parquet file {parquet_file}. Error: {e}", stacklevel=1)
                         continue
                 
                 if not non_empty_passed_list:

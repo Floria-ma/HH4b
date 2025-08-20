@@ -12,28 +12,72 @@ import uproot
 
 from HH4b import postprocessing, utils
 
-YEARS = ["2022", "2022EE", "2023", "2023BPix"]
-YEARS_COMBINED_DICT = {
-    "2022All": ["2022", "2022EE"],
+mass_label = {
+    "bbFatJetParTmassVis": r"$m_\mathrm{reg}$ (GeV)",
+    "bbFatJetPNetMassLegacy": r"$m_\mathrm{PNet}$ (GeV)",
+    "bbFatJetScoutParTmassCorrectedX2p": r"$m_\mathrm{X2p}$ (GeV)",
+    "bbFatJetScoutParTmassCorrectedW2p": r"$m_\mathrm{W2p}$ (GeV)",
+}
+
+YEARS = [
+    # "2022", 
+    # "2022EE", 
+    "2023", 
+    "2023BPix"]
+YEARS_COMBINED_DICT: dict = {
+    # "2022All": ["2022", "2022EE"],
     "2023All": ["2023", "2023BPix"],
 }
 SCRIPT_DIR = Path(__file__).resolve().parent
 
-PROCESSED_PATH: Path = Path("/eos/user/e/eheikkil/zbb_templates/ZbbHTJun18_v12v2_private_zbb/Zbb_events_combined.pkl")
-PROCESSED_PATH_ERAS: Path = Path("/eos/user/e/eheikkil/zbb_templates/ZbbHTJun18_v12v2_private_zbb/Zbb_events_eras.pkl")
-APPLY_Zto2Q_CORR: bool = False
-APPLY_TRIGGER_SF: bool = True
+TAG = "19Aug2025_v15_scouting_zbb"
+PROCESSED_PATH: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariations.pkl")
+PROCESSED_PATH_ERAS: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariations_eras.pkl")
+DATA_DIR: Path = Path(f"/eos/user/e/eheikkil/bbbb/skimmer/{TAG}/")
+
+APPLY_Zto2Q_CORR: bool = True
+APPLY_TRIGGER_SF: bool = False
+
+USE_SCOUTING_VARIABLES: bool = True # TODO: Add command line argument for this
+DATA_SAMPLES = [f"{key}_Run" for key in ["JetMET"]] if not USE_SCOUTING_VARIABLES else [
+    #2023
+    "Run2023C", 
+
+    # 2023BPix
+    "Run2023D",
+
+    # 2024
+    # "Run2024C",
+    # "Run2024D",
+    # "Run2024E",
+    # "Run2024F",
+    # "Run2024G",
+    # "Run2024H",
+    # "Run2024I",
+    # "Run2024J"
+    ]
 
 SAMPLES_DICT = { # TODO: Update for scouting
-    "data": [f"{key}_Run" for key in ["JetMET"]],
-    "ttbar": ["TTto4Q", "TTtoLNu2Q"],
-    "qcd": ["QCD_HT"],
-    "hbb": ["GluGluHto2B_M-125"],
-    "Zto2Q": ["Zto2Q-4Jets"],
-    "Wto2Q": ["Wto2Q-3Jets"],
+    "data": DATA_SAMPLES,
+    # "ttbar": ["TTto4Q", "TTtoLNu2Q"],
+    "qcd": [
+        # "QCD_HT" # For offline
+        "QCD" # For scouting
+        ],
+    # "hbb": ["GluGluHto2B_M-125"],
+    "Zto2Q": [
+        # "Zto2Q-4Jets" # For offline
+        "Zto2Q-2Jets" # For scouting
+        ],
+    "Wto2Q": [
+        # "Wto2Q-3Jets" # For offline
+        "Wto2Q-2Jets" # For scouting
+        ],
 }
+
 MC_SAMPLES_LIST = [sample for sample in SAMPLES_DICT if sample != "data"]
 
+# We don't do trigger SFs for scouting due to no triggers (only DST)
 trigger_sf_dir = SCRIPT_DIR.parent / "corrections/data/trigger_sfs"
 
 
@@ -43,16 +87,16 @@ def parse_args():
     parser.add_argument(
         "--data-dir",
         type=str,
-        default="/eos/user/e/eheikkil/bbbb/skimmer/ZbbHTJun18_v12v2_private_zbb/",
+        default=f"/eos/user/e/eheikkil/bbbb/skimmer/{TAG}/",
         help="Directory containing the Zbb data",
     )
 
     parser.add_argument(
         "--txbb-choice",
         type=str,
-        default="ParT",
-        choices=["GloParT", "ParT", "PNet", "ParticleNet"],
-        help="Tagger choice for TXbb score (default: 'ParT')",
+        default="ScoutGloParT",
+        choices=["GloParT", "ParT", "PNet", "ParticleNet", "ScoutGloParT"],
+        help="Tagger choice for TXbb score (default: 'ScoutGloParT')",
     )
 
     parser.add_argument(
@@ -101,37 +145,62 @@ def main():
     if "ParT" in args.txbb_choice:
         txbb_score = "bbFatJetParTTXbb"
         mass_name = "bbFatJetParTmassVis"
+    if "ScoutGloParT" in args.txbb_choice: # Overwrites previous one
+        txbb_score = "bbFatJetScoutParTTXbb"
+        mass_name = "bbFatJetScoutParTmassCorrectedX2p"
     elif "PNet" in args.txbb_choice or "ParticleNet" in args.txbb_choice:
         txbb_score = "bbFatJetPNetTXbbLegacy"
         mass_name = "bbFatJetPNetMassLegacy"
     else:
         raise ValueError(
-            f"Invalid TXbb choice: {args.txbb_choice}. " "Choices: {ParT, ParticleNet}."
+            f"Invalid TXbb choice: {args.txbb_choice}. " "Choices: {ParT, ParticleNet, ScoutGloParT}."
         )
     print(f"Using TXbb score {txbb_score} and mass variable {mass_name}")
 
     # Columns to load from the ntuples
     sys_vars = ["FSRPartonShower", "ISRPartonShower", "pileup"]
 
-    fatjet_vars = [
-        "bbFatJetPt",
-        "bbFatJetEta",
-        "bbFatJetMsd",
+    fatjet_vars_ParT_and_PNet = [
         "bbFatJetParTmassVis",
         "bbFatJetPNetMassLegacy",
         "bbFatJetParTTXbb",
-        "bbFatJetPNetTXbbLegacy",
+        "bbFatJetPNetTXbbLegacy"
     ]
+
+    fatjet_vars_ScoutGloParT = [
+        "bbFatJetScoutParTmassCorrectedX2p",
+        # "bbFatJetScoutParTmassCorrectedW2p", # W2p no handled correctly in bbbbSkimmer right now, doesn't make it here, or at least doesn't have variations
+        "bbFatJetScoutParTmassGeneric",
+        "bbFatJetScoutParTTXbb"
+    ]
+    
+    fatjet_vars = [
+        "bbFatJetPt",
+        "bbFatJetEta",
+        "bbFatJetMsd"
+    ] 
+
+    if not USE_SCOUTING_VARIABLES:
+        fatjet_vars += fatjet_vars_ParT_and_PNet
+    else:
+        fatjet_vars += fatjet_vars_ScoutGloParT
 
     pt_variations = []
     for jesr, ud in itertools.product(["JES", "JER"], ["up", "down"]):
         pt_variations.append(f"bbFatJetPt_{jesr}_{ud}")
 
     mass_variations = []
-    for jmsr, ud in itertools.product(["JMS", "JMR"], ["up", "down"]):
-        mass_variations.append(f"bbFatJetMsd_{jmsr}_{ud}")
-        mass_variations.append(f"bbFatJetParTmassVis_{jmsr}_{ud}")
-        mass_variations.append(f"bbFatJetPNetMassLegacy_{jmsr}_{ud}")
+    if not USE_SCOUTING_VARIABLES:
+        for jmsr, ud in itertools.product(["JMS", "JMR"], ["up", "down"]):
+            mass_variations.append(f"bbFatJetMsd_{jmsr}_{ud}")
+            mass_variations.append(f"bbFatJetParTmassVis_{jmsr}_{ud}")
+            mass_variations.append(f"bbFatJetPNetMassLegacy_{jmsr}_{ud}")
+    else:
+        for jmsr, ud in itertools.product(["JMS", "JMR"], ["up", "down"]):
+            mass_variations.append(f"bbFatJetMsd_{jmsr}_{ud}")
+            mass_variations.append(f"bbFatJetScoutParTmassCorrectedX2p_{jmsr}_{ud}")
+            # mass_variations.append(f"bbFatJetScoutParTmassCorrectedW2p_{jmsr}_{ud}")
+            mass_variations.append(f"bbFatJetScoutParTmassGeneric_{jmsr}_{ud}")
 
     base_columns = [(var, 2) for var in fatjet_vars] + [("weight", 1)]
     print(f"Base columns: {base_columns}")
@@ -164,6 +233,7 @@ def main():
         ],
     }
 
+    # TODO: pt variations not done in bbbbSkimmer right now, fix!
     load_columns_pt_var = []
     for pt_var in pt_variations:
         load_columns_pt_var.append((pt_var, 2))
@@ -184,26 +254,27 @@ def main():
     extra_columns_dict = {
         "data": [],
         "qcd": load_weight_shifts,
-        "ttbar": MC_common_extra_columns,
-        "hbb": MC_common_extra_columns,
+        # "ttbar": MC_common_extra_columns,
+        # "hbb": MC_common_extra_columns,
         "Zto2Q": MC_common_extra_columns + ZQQ_extra_columns,
         "Wto2Q": MC_common_extra_columns + WQQ_extra_columns,
     }
     print(f"Extra columns: {extra_columns_dict}")
 
     # Trigger efficiency corrections
-    trigger_eff_txbb = {
-        year: correctionlib.CorrectionSet.from_file(
-            str(trigger_sf_dir / f"fatjet_triggereff_{year}_txbbGloParT_QCD.json")
-        )
-        for year in YEARS
-    }
-    trigger_eff_ptmsd = {
-        year: correctionlib.CorrectionSet.from_file(
-            str(trigger_sf_dir / f"fatjet_triggereff_{year}_ptmsd_QCD.json")
-        )
-        for year in YEARS
-    }
+    if not USE_SCOUTING_VARIABLES: # One would have to do this for the DST trigger which we are using?
+        trigger_eff_txbb = {
+            year: correctionlib.CorrectionSet.from_file(
+                str(trigger_sf_dir / f"fatjet_triggereff_{year}_txbbGloParT_QCD.json")
+            )
+            for year in YEARS
+        }
+        trigger_eff_ptmsd = {
+            year: correctionlib.CorrectionSet.from_file(
+                str(trigger_sf_dir / f"fatjet_triggereff_{year}_ptmsd_QCD.json")
+            )
+            for year in YEARS
+        }
 
     def _compute_SF(mc_eff_set, data_eff_set, *args):
         """Helper function to compute scale factor and error for a given efficiency set."""
@@ -260,8 +331,8 @@ def main():
         return sf, sf_up, sf_down
 
     # if True, apply the Z->2Q corrections from ZMuMu measurement
-    if APPLY_Zto2Q_CORR: # TODO: Scouting analysis needs this redone?
-        print("Applying Z->2Q corrections from ZMuMu measurement...")
+    if APPLY_Zto2Q_CORR: 
+        print("Loading Z->2Q corrections from ZMuMu measurement...")
         corr_dir = Path("ZMuMu_corrs")
         corr_dict = {}
 
@@ -278,7 +349,7 @@ def main():
         corr_dict = None
         print("Z->2Q corrections are not applied.")
 
-    path_dir = "/eos/user/e/eheikkil/bbbb/skimmer/ZbbHTJun18_v12v2_private_zbb/"
+
     if args.reprocess or not PROCESSED_PATH.exists():
         events_dict = {}
         for year in YEARS:
@@ -286,53 +357,69 @@ def main():
 
             # Have to load the samples separately because branches vary
             for sample, sample_list in SAMPLES_DICT.items():
+
                 print(f"Loading {sample} for {year}...")
-                triggers_cols = [(trigger, 1) for trigger in triggers[year]]
+                
+                triggers_cols = [(trigger, 1) for trigger in triggers[year]] if not USE_SCOUTING_VARIABLES else []
                 columns = triggers_cols + base_columns + extra_columns_dict.get(sample, [])
                 
-                loaded_data = utils.load_samples(
-                        data_dir=path_dir,
-                        samples={sample: sample_list},
+                try:
+                    loaded = utils.load_samples(
+                        data_dir=DATA_DIR,
+                        samples={sample: sample_list},  # only load one sample type at a time
                         year=year,
                         columns=utils.format_columns(columns),
                         variations=True,
-                        weight_shifts=["FSRPartonShower", "ISRPartonShower", "pileup"],
+                        weight_shifts=["FSRPartonShower", "ISRPartonShower"]#, "pileup"],
+                        # load_weight_noxsec=True
                     )
+                    
+                    if sample not in loaded or loaded[sample].empty:
+                        print(loaded)
+                        print(f"No data loaded for {sample} in year {year}. Skipping")
+                        continue
 
-                if (not loaded_data) or (sample not in loaded_data):
-                    print(f"No data loaded for {sample} in {year}. Skipping...")
-                    continue   
-
-                df = loaded_data[sample]
+                    df = loaded[sample]
             
-                for pt_var in ["bbFatJetPt"] + pt_variations:
-                    if pt_var not in df.columns:
-                        for i in range(2):
-                            df[f"{pt_var}{i}"] = df[("bbFatJetPt", i)].copy()
+                    for pt_var in ["bbFatJetPt"] + pt_variations:
+                        if pt_var not in df.columns:
+                            for i in range(2):
+                                df[f"{pt_var}{i}"] = df[("bbFatJetPt", i)].copy()
 
-                # if mass variations are not present, set them to mass
-                for mass_var in [
-                    "bbFatJetMsd",
-                    "bbFatJetParTmassVis",
-                    "bbFatJetPNetMassLegacy",
-                ] + mass_variations:
-                    if mass_var not in df.columns:
-                        for i in range(2):
-                            df[f"{mass_var}{i}"] = df[(mass_var.split("_")[0], i)].copy()
+                    # if mass variations are not present, set them to mass
+                    for mass_var in [
+                        # "bbFatJetMsd", # Comment these in for offline variables <-> GloParT3 not supoorted in this code right now, so only really for the v12 private nanos used by Caltech. Scouting MC files which have GloParT3 will also not work due to this
+                        # "bbFatJetParTmassVis",
+                        # "bbFatJetPNetMassLegacy",
+                        "bbFatJetScoutParTmassCorrectedX2p",
+                        "bbFatJetScoutParTmassGeneric",
+                        "bbFatJetMsd"
+                    ] + mass_variations:
+                        if mass_var not in df.columns: # Does "var" here mean "variable" or "variation"?
+                            for i in range(2):
+                                df[f"{mass_var}{i}"] = df[(mass_var.split("_")[0], i)].copy()
 
-                if sample != "data":
-                    # evalute trigger scale factors
-                    sf, sf_up, sf_down = eval_trigger_sf(
-                        txbb=df[("bbFatJetParTTXbb", 0)].values, # TODO: Does this need changing for glopartv3?
-                        pt=df[("bbFatJetPt", 0)].values,
-                        msd=df[("bbFatJetMsd", 0)].values,
-                        year=year,
-                    )
-                    df["SF_trigger"] = sf
-                    df["SF_trigger_up"] = sf_up
-                    df["SF_trigger_down"] = sf_down
+                    if not USE_SCOUTING_VARIABLES:
+                        if sample != "data":
+                            # evalute trigger scale factors
+                            sf, sf_up, sf_down = eval_trigger_sf(
+                                txbb=df[("bbFatJetParTTXbb", 0)].values, # TODO: Does this need changing for glopartv3?
+                                pt=df[("bbFatJetPt", 0)].values,
+                                msd=df[("bbFatJetMsd", 0)].values,
+                                year=year,
+                            )
+                            df["SF_trigger"] = sf
+                            df["SF_trigger_up"] = sf_up
+                            df["SF_trigger_down"] = sf_down
+                    
+                    loaded[sample]  = df
 
-                events_dict[year][sample] = df
+                    events_dict[year].update(loaded)  # merge into events_dict
+
+                    print(loaded[sample].keys())
+
+                except Exception as e:
+                    print(f"Error loading sample {sample} for {year}: {e}")
 
                 # concatenate all dataframes for this sample
                 # events_dict[year][sample] = pd.concat(events_dict[year][sample], ignore_index=True)
@@ -363,6 +450,117 @@ def main():
         with PROCESSED_PATH.open("rb") as f:
             events_combined = pd.read_pickle(f)
         print(f"Loaded events from {PROCESSED_PATH}")
+
+# 
+    # if args.reprocess or not PROCESSED_PATH.exists():
+    #     events_dict = {}
+    #     for year in YEARS:
+    #         events_dict[year] = {}
+
+    #         for sample, sample_list in SAMPLES_DICT.items():
+    #             print(f"Loading {sample} for {year}...")
+
+    #             # Build columns
+    #             triggers_cols = [(trigger, 1) for trigger in triggers[year]] if not USE_SCOUTING_VARIABLES else []
+    #             columns = triggers_cols + base_columns + extra_columns_dict.get(sample, [])
+
+    #             try:
+    #                 loaded = utils.load_samples(
+    #                     data_dir=DATA_DIR,
+    #                     samples={sample: sample_list},  # only load one sample type at a time
+    #                     year=year,
+    #                     columns=utils.format_columns(columns),
+    #                     variations=True,
+    #                     weight_shifts=["FSRPartonShower", "ISRPartonShower", "pileup"],
+    #                 )
+
+    #                 if sample not in loaded or loaded[sample].empty:
+    #                     print(f"No data loaded for {sample} in year {year}. Skipping")
+    #                     continue
+
+    #                 df = loaded[sample]
+
+    #                 # pt variations
+    #                 for pt_var in ["bbFatJetPt"] + pt_variations:
+    #                     if pt_var not in df.columns:
+    #                         for i in range(2):
+    #                             df[f"{pt_var}{i}"] = df[("bbFatJetPt", i)].copy()
+
+    #                 # mass variations
+    #                 for mass_var in [
+    #                     "bbFatJetScoutParTmassCorrectedX2p",
+    #                     "bbFatJetScoutParTmassCorrectedW2p",
+    #                     "bbFatJetScoutParTmassGeneric",
+    #                     "bbFatJetMsd"
+    #                 ] + mass_variations:
+    #                     if mass_var not in df.columns:
+    #                         for i in range(2):
+    #                             df[f"{mass_var}{i}"] = df[(mass_var.split("_")[0], i)].copy()
+
+    #                 # trigger sf, irrelevant for scouting TODO: DST?
+    #                 if not USE_SCOUTING_VARIABLES and sample != "data":
+    #                     sf, sf_up, sf_down = eval_trigger_sf(
+    #                         txbb=df[("bbFatJetParTTXbb", 0)].values,
+    #                         pt=df[("bbFatJetPt", 0)].values,
+    #                         msd=df[("bbFatJetMsd", 0)].values,
+    #                         year=year,
+    #                     )
+    #                     df["SF_trigger"] = sf
+    #                     df["SF_trigger_up"] = sf_up
+    #                     df["SF_trigger_down"] = sf_down
+
+    #                 loaded[sample] = df
+
+    #                 events_dict[year].update(loaded)
+
+    #             except Exception as e:
+    #                 print(f"Error loading {sample} for {year}: {e}")
+    #                 continue
+
+    #     # combine years
+    #     print("Combining events from different years...")
+    #     events_combined = {year: {} for year in YEARS_COMBINED_DICT}
+    #     for sample in SAMPLES_DICT:
+    #         for combined_year, year_list in YEARS_COMBINED_DICT.items():
+    #             dfs_to_concat = [
+    #                 events_dict[year][sample]
+    #                 for year in year_list
+    #                 if sample in events_dict[year]
+    #             ]
+    #             if dfs_to_concat:  # Only concat if something was loaded
+    #                 events_combined[combined_year][sample] = pd.concat(dfs_to_concat)
+
+    #     # Save combined & per-era
+    #     with PROCESSED_PATH.open("wb") as f:
+    #         pd.to_pickle(events_combined, f)
+    #     print(f"Events combined and saved to {PROCESSED_PATH}")
+
+    #     with PROCESSED_PATH_ERAS.open("wb") as f:
+    #         pd.to_pickle(events_dict, f)
+    #     print(f"Events by eras and saved to {PROCESSED_PATH_ERAS}")
+
+    #     del events_dict  # Free memory
+
+    # else:
+    #     print(f"Loading events from {PROCESSED_PATH}...")
+    #     with PROCESSED_PATH.open("rb") as f:
+    #         events_combined = pd.read_pickle(f)
+    #     print(f"Loaded events from {PROCESSED_PATH}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     # apply ZQQ corrections if needed
     if APPLY_Zto2Q_CORR:
@@ -465,8 +663,9 @@ def main():
         "AK8PFJet230_SoftDropMass40_PNetBB0p06",
     ]
 
-    events_high_pt = select_triggers(events_combined, trigger_list_high_pt)
-    events_PNet = select_triggers(events_combined, trigger_list_PNet)
+    if not USE_SCOUTING_VARIABLES:
+        events_high_pt = select_triggers(events_combined, trigger_list_high_pt)
+        events_PNet = select_triggers(events_combined, trigger_list_PNet)
 
     # apply trigger sf to events_PNet
     if APPLY_TRIGGER_SF:
@@ -486,7 +685,7 @@ def main():
                     sample_df["weight_TriggerDown"] = weight * sf_down
                 events_PNet[year][sample] = sample_df
     else:
-        print("Trigger scale factors are not applied to events_PNet.")
+        print("Trigger scale factors are not applied to events_PNet. Will not work in scouting!")
 
     # bkg_keys = ["Zto2Q_CC", "Zto2Q_QQ", "Zto2Q_unmatched", "Wto2Q", "hbb", "ttbar", "qcd"]
     # sig_keys = ["Zto2Q_BB"]
@@ -505,10 +704,11 @@ def main():
     bg_order = list(reversed(bkg_keys))
 
     jshift_keys = [""]
-    for var, ud in itertools.product(["JES", "JER", "JMS", "JMR"], ["up", "down"]):
+    for var, ud in itertools.product(["JES", "JER", "JMS", "JMR"], ["up", "down"]): 
         jshift_keys.append(f"{var}_{ud}")
 
     weight_shifts = {
+        # TODO: Comment back in once have rerun the skimmer with pileup variations
         "pileup": postprocessing.Syst(
             samples=MC_SAMPLES_FINAL_LIST, label="Pileup", years=list(YEARS_COMBINED_DICT.keys())
         ),
@@ -544,7 +744,7 @@ def main():
         weight_shifts_trig_sf = {}
 
     print("Making templates...")
-    out_dir = Path(f"/eos/user/e/eheikkil/zbb_templates/ZbbHTJun18_v12v2_private_zbb/templates_zbb")
+    out_dir = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/")
     out_dir.mkdir(parents=True, exist_ok=True)
     for year in YEARS_COMBINED_DICT:
 
@@ -585,17 +785,22 @@ def main():
                 )
 
                 # determine which trigger to use
-                if pt_low < 550:
-                    events = events_PNet[year]
-                    weight_shifts_final = {
-                        **weight_shifts,
-                        **weight_shifts_trig_sf,
-                    }
-                    print(f"Using PNet trigger for {region_key} in {year}")
+                if not USE_SCOUTING_VARIABLES:
+                    if pt_low < 550:
+                        events = events_PNet[year]
+                        weight_shifts_final = {
+                            **weight_shifts,
+                            **weight_shifts_trig_sf,
+                        }
+                        print(f"Using PNet trigger for {region_key} in {year}")
+                    else:
+                        events = events_high_pt[year]
+                        weight_shifts_final = weight_shifts
+                        print(f"Using high pT trigger for {region_key} in {year}")
                 else:
-                    events = events_high_pt[year]
+                    events = events_combined[year]
                     weight_shifts_final = weight_shifts
-                    print(f"Using high pT trigger for {region_key} in {year}")
+                    print(f"Using scouting variables for {region_key} in {year}")
 
                 cutflows = {}
                 for sample in events:
@@ -603,7 +808,8 @@ def main():
                     cutflows[sample]["Skimmer Preselection"] = events_combined[year][sample][
                         "finalWeight"
                     ].sum()
-                    cutflows[sample]["HLT"] = events[sample]["finalWeight"].sum()
+                    if not USE_SCOUTING_VARIABLES: # Scouting no HLT
+                        cutflows[sample]["HLT"] = events[sample]["finalWeight"].sum()
                 cutflows = pd.DataFrame.from_dict(cutflows).transpose()
 
                 # Create a region
@@ -628,7 +834,7 @@ def main():
 
             fit_shape_var = postprocessing.ShapeVar(
                 mass_branch,
-                r"$m_\mathrm{reg}$ (GeV)",
+                mass_label[mass_name],
                 [n_mass_bins, m_low, m_high],
                 reg=True,
             )
