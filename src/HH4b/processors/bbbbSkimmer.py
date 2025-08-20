@@ -1594,7 +1594,7 @@ class bbbbSkimmer(SkimmerABC):
 
             else: # use scouting variables
                 # >=1 AK8 jets
-                add_selection("num_ak8jets", eventVars["nFatJets"] >= 1, *selection_args)
+                add_selection("num_ak8jets", eventVars["nFatJets"] >= 2, *selection_args)
                 # FatJet0 with pT>250, mSD>40
                 cut_pt_lead = (
                     np.sum(
@@ -1607,27 +1607,27 @@ class bbbbSkimmer(SkimmerABC):
 
                 # Commenting these out for now since we want to do inclusive production mode rn - Eetu 30/07/2025
                 # FatJet1 with pT>200
-                # cut_pt_subl = (
-                #     np.sum(
-                #         bbFatJetVars["bbFatJetPt"][:, :2] >= 150, # Changed from 200 to 150 for scouting
-                #         axis=1,
-                #     )
-                # ) >= 2  # >=2 because we already have the lead fatjet
-                # add_selection("ak8_pt_subl", cut_pt_subl, *selection_args)
+                cut_pt_subl = (
+                    np.sum(
+                        bbFatJetVars["bbFatJetPt"][:, :2] >= 150, # Changed from 200 to 150 for scouting
+                        axis=1,
+                    )
+                ) >= 2  # >=2 because we already have the lead fatjet
+                add_selection("ak8_pt_subl", cut_pt_subl, *selection_args)
                 # # eta cut already done
 
-                # def del_phi(phi1, phi2):
-                #     return np.abs((phi1 - phi2 + np.pi) % (2 * np.pi) - np.pi)
+                def del_phi(phi1, phi2):
+                    return np.abs((phi1 - phi2 + np.pi) % (2 * np.pi) - np.pi)
 
-                # # back-to-back AK8 jets
-                # zbb_ak8jets_dphi = np.abs(
-                #     del_phi(bbFatJetVars["bbFatJetPhi"][:, 0], bbFatJetVars["bbFatJetPhi"][:, 1])
-                # )
-                # add_selection("ak8_back2back", zbb_ak8jets_dphi >= (np.pi / 2), *selection_args)
+                # back-to-back AK8 jets
+                zbb_ak8jets_dphi = np.abs(
+                    del_phi(bbFatJetVars["bbFatJetPhi"][:, 0], bbFatJetVars["bbFatJetPhi"][:, 1])
+                )
+                add_selection("ak8_back2back", zbb_ak8jets_dphi >= (np.pi / 2), *selection_args)
 
-                # >= 1 AK8 jet with ParT/PNet Xbb >= 0.1
+                # >= 1 AK8 jet with ParT/PNet Xbb >= 0.3
                 cut_txbb = (
-                    (np.sum(bbFatJetVars["bbFatJetScoutParTTXbb"][:, :2] >= 0.1, axis=1) >= 1)
+                    (np.sum(bbFatJetVars["bbFatJetScoutParTTXbb"][:, :2] >= 0.3, axis=1) >= 1) # A lot higher
                     # | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1) # TODO: Ask Patin if this is needed
                 )
                
