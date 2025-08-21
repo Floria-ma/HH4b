@@ -1302,7 +1302,7 @@ class bbbbSkimmer(SkimmerABC):
             **genVars,
             **eventVars,
             **pileupVars,
-            # **DSTVars, # DST instead of HLT for scouting
+            **DSTVars, # DST instead of HLT for scouting
             **ak4JetAwayVars,
             **ak8FatJetVars,
             **bbFatJetVars,
@@ -1380,17 +1380,17 @@ class bbbbSkimmer(SkimmerABC):
             )
             add_selection("trigger", HLT_triggered, *selection_args)
             
-        if apply_trigger and self.use_scouting:
-            DST_list  = [events.DST[trigger] for trigger in self.DSTs[year] if trigger in events.DST.fields]
-            if DST_list :
-                DST_triggered = np.any(
-                    np.array(DST_list),
-                    axis=0,
-                )
-            else:
-                DST_triggered = zeros
+        # if apply_trigger and self.use_scouting:
+        #     DST_list  = [events.DST[trigger] for trigger in self.DSTs[year] if trigger in events.DST.fields]
+        #     if DST_list :
+        #         DST_triggered = np.any(
+        #             np.array(DST_list),
+        #             axis=0,
+        #         )
+        #     else:
+        #         DST_triggered = zeros
 
-            add_selection("dst", DST_triggered, *selection_args)
+        #     add_selection("dst", DST_triggered, *selection_args)
 
         # metfilters
         if not self.use_scouting: 
@@ -1662,6 +1662,18 @@ class bbbbSkimmer(SkimmerABC):
                     == 0
                 )
                 add_selection("top_veto", cut_top_veto, *selection_args)
+
+                if apply_trigger and self.use_scouting:
+                    DST_list  = [events.DST[trigger] for trigger in self.DSTs[year] if trigger in events.DST.fields]
+                    if DST_list :
+                        DST_triggered = np.any(
+                            np.array(DST_list),
+                            axis=0,
+                        )
+                    else:
+                        DST_triggered = zeros
+
+                    add_selection("dst", DST_triggered, *selection_args)
 
         elif self._region == "zbb-Zto2Q-DYLL":
             # dummy selection for Zbb-Zto2Q-DYLL region
