@@ -22,12 +22,12 @@ mass_label = {
 YEARS = [
     # "2022", 
     # "2022EE", 
-    # "2023", 
+    "2023", 
     "2023BPix"]
 YEARS_COMBINED_DICT: dict = {
     # "2022All": ["2022", "2022EE"],
     "2023All": [
-        # "2023",
+        "2023",
         "2023BPix"
         ],
 }
@@ -36,6 +36,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 TAG = "20Aug2025_v15_scouting_zbb"
 PROCESSED_PATH: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariations.pkl")
 PROCESSED_PATH_ERAS: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariations_eras.pkl")
+PROCESSED_PATH.parent.mkdir(parents=True, exist_ok=True)
 DATA_DIR: Path = Path(f"/eos/user/e/eheikkil/bbbb/skimmer/{TAG}/")
 
 APPLY_Zto2Q_CORR: bool = True
@@ -688,7 +689,7 @@ def main():
                     sample_df["weight_TriggerDown"] = weight * sf_down
                 events_PNet[year][sample] = sample_df
     else:
-        print("Trigger scale factors are not applied to events_PNet. Will not work in scouting!")
+        print("Trigger scale factors are not applied to events_PNet.")
 
     # bkg_keys = ["Zto2Q_CC", "Zto2Q_QQ", "Zto2Q_unmatched", "Wto2Q", "hbb", "ttbar", "qcd"]
     # sig_keys = ["Zto2Q_BB"]
@@ -699,8 +700,8 @@ def main():
         "Zto2Q_QQ",
         "Zto2Q_unmatched",
         "Wto2Q",
-        "hbb",
-        "ttbar",
+        # "hbb",
+        # "ttbar",
         "qcd",
     ]
     sig_keys = []
