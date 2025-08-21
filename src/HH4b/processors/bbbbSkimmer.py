@@ -1302,7 +1302,7 @@ class bbbbSkimmer(SkimmerABC):
             **genVars,
             **eventVars,
             **pileupVars,
-            **DSTVars, # DST instead of HLT for scouting
+            # **DSTVars, # DST instead of HLT for scouting
             **ak4JetAwayVars,
             **ak8FatJetVars,
             **bbFatJetVars,
@@ -1625,7 +1625,7 @@ class bbbbSkimmer(SkimmerABC):
                 )
                 add_selection("ak8_back2back", zbb_ak8jets_dphi >= (np.pi / 2), *selection_args)
 
-                # >= 1 AK8 jet with ParT/PNet Xbb >= 0.3
+                # >= 1 AK8 jet with ParT/PNet Xbb >= 0.
                 cut_txbb = (
                     (np.sum(bbFatJetVars["bbFatJetScoutParTTXbb"][:, :2] >= 0.3, axis=1) >= 1) # A lot higher
                     # | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1) # TODO: Ask Patin if this is needed
