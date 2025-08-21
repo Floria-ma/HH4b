@@ -22,15 +22,18 @@ mass_label = {
 YEARS = [
     # "2022", 
     # "2022EE", 
-    "2023", 
+    # "2023", 
     "2023BPix"]
 YEARS_COMBINED_DICT: dict = {
     # "2022All": ["2022", "2022EE"],
-    "2023All": ["2023", "2023BPix"],
+    "2023All": [
+        # "2023",
+        "2023BPix"
+        ],
 }
 SCRIPT_DIR = Path(__file__).resolve().parent
 
-TAG = "19Aug2025_v15_scouting_zbb"
+TAG = "20Aug2025_v15_scouting_zbb"
 PROCESSED_PATH: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariations.pkl")
 PROCESSED_PATH_ERAS: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariations_eras.pkl")
 DATA_DIR: Path = Path(f"/eos/user/e/eheikkil/bbbb/skimmer/{TAG}/")
@@ -77,7 +80,7 @@ SAMPLES_DICT = { # TODO: Update for scouting
 
 MC_SAMPLES_LIST = [sample for sample in SAMPLES_DICT if sample != "data"]
 
-# We don't do trigger SFs for scouting due to no triggers (only DST)
+# TODO: Do trigger sfs for DST
 trigger_sf_dir = SCRIPT_DIR.parent / "corrections/data/trigger_sfs"
 
 
@@ -370,7 +373,7 @@ def main():
                         year=year,
                         columns=utils.format_columns(columns),
                         variations=True,
-                        weight_shifts=["FSRPartonShower", "ISRPartonShower"]#, "pileup"],
+                        weight_shifts=["FSRPartonShower", "ISRPartonShower", "pileup"],
                         # load_weight_noxsec=True
                     )
                     
