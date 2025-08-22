@@ -1598,7 +1598,7 @@ class bbbbSkimmer(SkimmerABC):
                 # FatJet0 with pT>250, mSD>40
                 cut_pt_lead = (
                     np.sum(
-                        (bbFatJetVars["bbFatJetPt"][:, :2] >= 200) # Changed from 250 to 200 for scouting
+                        (bbFatJetVars["bbFatJetPt"][:, :2] >= 300) # Changed from 250 to 200 for scouting
                         & (bbFatJetVars["bbFatJetMsd"][:, :2] >= 40),
                         axis=1,
                     )
@@ -1609,7 +1609,7 @@ class bbbbSkimmer(SkimmerABC):
                 # FatJet1 with pT>200
                 cut_pt_subl = (
                     np.sum(
-                        bbFatJetVars["bbFatJetPt"][:, :2] >= 150, # Changed from 200 to 150 for scouting
+                        bbFatJetVars["bbFatJetPt"][:, :2] >= 250, # Changed from 200 to 150 for scouting
                         axis=1,
                     )
                 ) >= 2  # >=2 because we already have the lead fatjet
@@ -1634,7 +1634,7 @@ class bbbbSkimmer(SkimmerABC):
                 add_selection("ak8bb_txbb", cut_txbb, *selection_args)
 
                 # HT > 500
-                add_selection("ht500", eventVars["ht"] >= 500, *selection_args)
+                add_selection("ht500", eventVars["ht"] >= 600, *selection_args)
 
                 # 0 veto leptons
                 # TODO: check if this is correct
