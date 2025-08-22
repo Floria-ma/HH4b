@@ -109,6 +109,7 @@ logger.setLevel(logging.INFO)
 
 package_path = str(pathlib.Path(__file__).parent.parent.resolve())
 
+L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5 = False
 
 class bbbbSkimmer(SkimmerABC):
     """
@@ -301,6 +302,59 @@ class bbbbSkimmer(SkimmerABC):
         }
 
         if self.use_scouting: self.DSTs = DSTs[region] 
+
+        L1s = {
+            "zbb": {
+                "2023": [
+                    "HTT200er",
+                    "HTT255er",
+                    "HTT280er",
+                    "_HTT320er",
+                    "_HTT360er",
+                    "HTT400er",
+                    "HTT450er",
+                    "ETT2000",
+                    "SingleJet180",
+                    "SingleJet200",
+                    "DoubleJet30er2p5_Mass_Min250_dEta_Max1p5", ## Min 250 added (with this, a logical OR of all L1s is equivalent to standard, i.e. 2023C-v3 onwards DST_Run3_PFScoutingPixelTracking)
+                    "DoubleJet30er2p5_Mass_Min300_dEta_Max1p5",
+                    "DoubleJet30er2p5_Mass_Min330_dEta_Max1p5",
+                    "DoubleJet30er2p5_Mass_Min360_dEta_Max1p5",
+                ] if L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5 else [ # This is what DST_Run3_PFScoutingPixelTracking looks like before 2023C-v3
+                    "HTT200er",
+                    "HTT255er",
+                    "HTT280er",
+                    "HTT320er",
+                    "HTT360er",
+                    "HTT400er",
+                    "HTT450er",
+                    "ETT2000",
+                    "SingleJet180",
+                    "SingleJet200",
+                    "DoubleJet30er2p5_Mass_Min300_dEta_Max1p5",
+                    "DoubleJet30er2p5_Mass_Min330_dEta_Max1p5",
+                    "DoubleJet30er2p5_Mass_Min360_dEta_Max1p5",
+                ],
+                "2023BPix": [
+                    "HTT200er",
+                    "HTT255er",
+                    "HTT280er",
+                    "HTT320er",
+                    "HTT360er",
+                    "HTT400er",
+                    "HTT450er",
+                    "ETT2000",
+                    "SingleJet180",
+                    "SingleJet200",
+                    "DoubleJet30er2p5_Mass_Min250_dEta_Max1p5", 
+                    "DoubleJet30er2p5_Mass_Min300_dEta_Max1p5",
+                    "DoubleJet30er2p5_Mass_Min330_dEta_Max1p5",
+                    "DoubleJet30er2p5_Mass_Min360_dEta_Max1p5"
+                ] 
+            }
+        }
+
+        if self.use_scouting: self.L1s = L1s[region] 
 
         # HLT selection
         HLTs = {
@@ -1230,6 +1284,16 @@ class bbbbSkimmer(SkimmerABC):
                 )
                 for trigger in self.DSTs
             }
+
+            L1vars = { 
+                trigger: (
+                    events.L1[trigger].to_numpy().astype(int)
+                    if trigger in events.L1.fields
+                    else zeros
+                )
+                for trigger in self.L1s
+            }
+
             print("DST vars", f"{time.time() - start:.2f}")
 
 
@@ -1303,6 +1367,7 @@ class bbbbSkimmer(SkimmerABC):
             **eventVars,
             **pileupVars,
             **DSTVars, # DST instead of HLT for scouting
+            **L1vars,
             **ak4JetAwayVars,
             **ak8FatJetVars,
             **bbFatJetVars,
@@ -1391,6 +1456,18 @@ class bbbbSkimmer(SkimmerABC):
         #         DST_triggered = zeros
 
         #     add_selection("dst", DST_triggered, *selection_args)
+
+        if apply_trigger and self.use_scouting:
+            L1_list  = [events.L1[trigger] for trigger in self.L1s[year] if trigger in events.L1.fields]
+            if L1_list :
+                L1_triggered = np.any(
+                    np.array(L1_list),
+                    axis=0,
+                )
+            else:
+                L1_triggered = zeros
+
+            add_selection("L1LogicalOR", L1_triggered, *selection_args)
 
         # metfilters
         if not self.use_scouting: 
@@ -1593,12 +1670,12 @@ class bbbbSkimmer(SkimmerABC):
                 add_selection("top_veto", cut_top_veto, *selection_args)
 
             else: # use scouting variables
-                # >=1 AK8 jets
+                # >=2 AK8 jets
                 add_selection("num_ak8jets", eventVars["nFatJets"] >= 2, *selection_args)
                 # FatJet0 with pT>250, mSD>40
                 cut_pt_lead = (
                     np.sum(
-                        (bbFatJetVars["bbFatJetPt"][:, :2] >= 300) # Changed from 250 to 200 for scouting
+                        (bbFatJetVars["bbFatJetPt"][:, :2] >= 200) # Changed from 250 to 200 for scouting
                         & (bbFatJetVars["bbFatJetMsd"][:, :2] >= 40),
                         axis=1,
                     )
@@ -1609,7 +1686,7 @@ class bbbbSkimmer(SkimmerABC):
                 # FatJet1 with pT>200
                 cut_pt_subl = (
                     np.sum(
-                        bbFatJetVars["bbFatJetPt"][:, :2] >= 250, # Changed from 200 to 150 for scouting
+                        bbFatJetVars["bbFatJetPt"][:, :2] >= 170, # Changed from 200 to 150 for scouting
                         axis=1,
                     )
                 ) >= 2  # >=2 because we already have the lead fatjet
@@ -1634,16 +1711,7 @@ class bbbbSkimmer(SkimmerABC):
                 add_selection("ak8bb_txbb", cut_txbb, *selection_args)
 
                 # HT > 500
-                add_selection("ht500", eventVars["ht"] >= 600, *selection_args)
-
-                # 0 veto leptons
-                # TODO: check if this is correct
-                # add_selection(
-                #     "0lep",
-                #     (ak.sum(veto_muon_sel, axis=1) == 0) & (ak.sum(veto_electron_sel, axis=1) == 0),
-                #     *selection_args,
-                # )
-                # Commenting out 0lep because electrons not well defined in scouting, but muons would be so consider changing back at some point - Eetu 11/07/25
+                add_selection("ht500", eventVars["ht"] >= 500, *selection_args)
 
                 # top veto: no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
                 medium_btag_th_dict = { # Commented out values are for deepFlavB
@@ -1662,6 +1730,15 @@ class bbbbSkimmer(SkimmerABC):
                     == 0
                 )
                 add_selection("top_veto", cut_top_veto, *selection_args)
+
+                # 0 veto leptons
+                # TODO: check if this is correct
+                # add_selection(
+                #     "0lep",
+                #     (ak.sum(veto_muon_sel, axis=1) == 0) & (ak.sum(veto_electron_sel, axis=1) == 0),
+                #     *selection_args,
+                # )
+                # Commenting out 0lep because electrons not well defined in scouting, but muons would be so consider changing back at some point - Eetu 11/07/25
 
                 # if apply_trigger and self.use_scouting:
                 #     DST_list  = [events.DST[trigger] for trigger in self.DSTs[year] if trigger in events.DST.fields]
