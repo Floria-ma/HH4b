@@ -1367,7 +1367,7 @@ class bbbbSkimmer(SkimmerABC):
             **eventVars,
             **pileupVars,
             **DSTVars, # DST instead of HLT for scouting
-            **L1vars,
+            # **L1vars,
             **ak4JetAwayVars,
             **ak8FatJetVars,
             **bbFatJetVars,
