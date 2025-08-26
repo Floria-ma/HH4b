@@ -109,8 +109,6 @@ logger.setLevel(logging.INFO)
 
 package_path = str(pathlib.Path(__file__).parent.parent.resolve())
 
-L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5 = False
-
 class bbbbSkimmer(SkimmerABC):
     """
     Skims nanoaod files, saving selected branches and events passing preselection cuts
@@ -290,71 +288,18 @@ class bbbbSkimmer(SkimmerABC):
         DSTs = {
             "zbb": {
                 "2023": [
-                    "Run3_JetHT_PFScoutingPixelTracking",
+                    "Run3_JetHT_PFScoutingPixelTracking", # Hotfix following https://codimd.web.cern.ch/D8_9OfwlSF66qkbBy6sjkg applied in code
                 ],
                 "2023BPix": [
                     "Run3_JetHT_PFScoutingPixelTracking",
                 ],
                 "2024": [
-                    "Run3_JetHT_PFScoutingPixelTracking", # Should this be changed?
+                    "DST_PFScouting_JetHT", 
                 ],
             }
         }
 
         if self.use_scouting: self.DSTs = DSTs[region] 
-
-        L1s = {
-            "zbb": {
-                "2023": [
-                    "HTT200er",
-                    "HTT255er",
-                    "HTT280er",
-                    "_HTT320er",
-                    "_HTT360er",
-                    "HTT400er",
-                    "HTT450er",
-                    "ETT2000",
-                    "SingleJet180",
-                    "SingleJet200",
-                    "DoubleJet30er2p5_Mass_Min250_dEta_Max1p5", ## Min 250 added (with this, a logical OR of all L1s is equivalent to standard, i.e. 2023C-v3 onwards DST_Run3_PFScoutingPixelTracking)
-                    "DoubleJet30er2p5_Mass_Min300_dEta_Max1p5",
-                    "DoubleJet30er2p5_Mass_Min330_dEta_Max1p5",
-                    "DoubleJet30er2p5_Mass_Min360_dEta_Max1p5",
-                ] if L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5 else [ # This is what DST_Run3_PFScoutingPixelTracking looks like before 2023C-v3
-                    "HTT200er",
-                    "HTT255er",
-                    "HTT280er",
-                    "HTT320er",
-                    "HTT360er",
-                    "HTT400er",
-                    "HTT450er",
-                    "ETT2000",
-                    "SingleJet180",
-                    "SingleJet200",
-                    "DoubleJet30er2p5_Mass_Min300_dEta_Max1p5",
-                    "DoubleJet30er2p5_Mass_Min330_dEta_Max1p5",
-                    "DoubleJet30er2p5_Mass_Min360_dEta_Max1p5",
-                ],
-                "2023BPix": [
-                    "HTT200er",
-                    "HTT255er",
-                    "HTT280er",
-                    "HTT320er",
-                    "HTT360er",
-                    "HTT400er",
-                    "HTT450er",
-                    "ETT2000",
-                    "SingleJet180",
-                    "SingleJet200",
-                    "DoubleJet30er2p5_Mass_Min250_dEta_Max1p5", 
-                    "DoubleJet30er2p5_Mass_Min300_dEta_Max1p5",
-                    "DoubleJet30er2p5_Mass_Min330_dEta_Max1p5",
-                    "DoubleJet30er2p5_Mass_Min360_dEta_Max1p5"
-                ] 
-            }
-        }
-
-        if self.use_scouting: self.L1s = L1s[region] 
 
         # HLT selection
         HLTs = {
@@ -1291,7 +1236,21 @@ class bbbbSkimmer(SkimmerABC):
                     if trigger in events.L1.fields
                     else zeros
                 )
-                for trigger in self.L1s
+                for trigger in [
+                    "HTT200er",
+                    "HTT255er",
+                    "HTT280er",
+                    "HTT320er",
+                    "HTT360er",
+                    "HTT400er",
+                    "HTT450er",
+                    "ETT2000",
+                    "SingleJet180",
+                    "SingleJet200",
+                    "DoubleJet30er2p5_Mass_Min300_dEta_Max1p5",
+                    "DoubleJet30er2p5_Mass_Min330_dEta_Max1p5",
+                    "DoubleJet30er2p5_Mass_Min360_dEta_Max1p5",
+                ]
             }
 
             print("DST vars", f"{time.time() - start:.2f}")
@@ -1445,29 +1404,59 @@ class bbbbSkimmer(SkimmerABC):
             )
             add_selection("trigger", HLT_triggered, *selection_args)
             
-        # if apply_trigger and self.use_scouting:
-        #     DST_list  = [events.DST[trigger] for trigger in self.DSTs[year] if trigger in events.DST.fields]
-        #     if DST_list :
-        #         DST_triggered = np.any(
-        #             np.array(DST_list),
-        #             axis=0,
-        #         )
-        #     else:
-        #         DST_triggered = zeros
+        if self.use_scouting and apply_trigger:
+            # Pre 2023C-v2 DST_Run3_PFScoutingPixelTracking contained muon seeds. Afterwards it was simply jet + HT L1 seeds.
+            # We want to use the jet + HT seeds throughout, so for 2023C-v2 and earlier we apply an OR of the L1 seeds. For 
+            # later years we simply use the catch-all DST_Run3_PFScoutingPixelTracking trigger path. 
 
-        #     add_selection("dst", DST_triggered, *selection_args)
+            # Note if you are using 2022 MC, it may contain muon seeds in the DST paths (check). The 2023C MC uses the later trigger menu,
+            # where DST is simply jet + HT throughout the whole sample. This is a warning, I have no clue if this is the actual case in 2022 MC.
 
-        if apply_trigger and self.use_scouting:
-            L1_list  = [events.L1[trigger] for trigger in self.L1s[year] if trigger in events.L1.fields]
-            if L1_list :
-                L1_triggered = np.any(
-                    np.array(L1_list),
-                    axis=0,
-                )
+            # Note also name change in 2024 -> DST_PFScouting_JetHT
+
+            # Reference: https://codimd.web.cern.ch/D8_9OfwlSF66qkbBy6sjkg
+            if isData:
+                mask = events.run < 367621 # Implemented as a mask because some files have more than 1 run number and truth value of an array is ambigious
+            
+                L1_Jet_HT_seeds = [
+                    "HTT200er",
+                    "HTT255er",
+                    "HTT280er",
+                    "HTT320er",
+                    "HTT360er",
+                    "HTT400er",
+                    "HTT450er",
+                    "ETT2000",
+                    "SingleJet180",
+                    "SingleJet200",
+                    "DoubleJet30er2p5_Mass_Min300_dEta_Max1p5",
+                    "DoubleJet30er2p5_Mass_Min330_dEta_Max1p5",
+                    "DoubleJet30er2p5_Mass_Min360_dEta_Max1p5",
+                ]
+
+                DST_list_pre367621 = [events.L1[seed] for seed in L1_Jet_HT_seeds if seed in events.L1.fields]
+                DST_list_post367621 = [events.DST[trigger] for trigger in self.DSTs[year] if trigger in events.DST.fields]
+
+                # Logical OR
+                DST_triggered_pre367621 = np.any(np.column_stack(DST_list_pre367621), axis=1) if DST_list_pre367621 else np.zeros(len(events), dtype=bool)
+                DST_triggered_post367621 = np.any(np.column_stack(DST_list_post367621), axis=1) if DST_list_post367621 else np.zeros(len(events), dtype=bool)
+
+                # Combine pre and post 367621 results based on the mask
+                DST_triggered = ak.where(mask, DST_triggered_pre367621, DST_triggered_post367621)
+            
             else:
-                L1_triggered = zeros
+                DST_list  = [events.DST[trigger] for trigger in self.DSTs[year] if trigger in events.DST.fields] 
+            
+                # Logical OR
+                if DST_list :
+                    DST_triggered = np.any(
+                        np.array(DST_list),
+                        axis=0,
+                    )
+                else:
+                    DST_triggered = zeros
 
-            add_selection("L1LogicalOR", L1_triggered, *selection_args)
+            add_selection("dst", DST_triggered, *selection_args)
 
         # metfilters
         if not self.use_scouting: 
