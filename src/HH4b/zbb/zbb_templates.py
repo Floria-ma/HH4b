@@ -17,25 +17,27 @@ mass_label = {
     "bbFatJetPNetMassLegacy": r"$m_\mathrm{PNet}$ (GeV)",
     "bbFatJetScoutParTmassCorrectedX2p": r"$m_\mathrm{X2p}$ (GeV)",
     "bbFatJetScoutParTmassCorrectedW2p": r"$m_\mathrm{W2p}$ (GeV)",
+    "bbFatJetScoutParTmassGeneric": r"$m_\mathrm{generic}$ (GeV)",
 }
 
 YEARS = [
     # "2022", 
     # "2022EE", 
-    "2023", 
-    "2023BPix"]
+    # "2023", 
+     "2023BPix"
+    ]
 YEARS_COMBINED_DICT: dict = {
     # "2022All": ["2022", "2022EE"],
-    "2023All": [
-        "2023",
+    "2023BPix": [
+        # "2023",
         "2023BPix"
         ],
 }
 SCRIPT_DIR = Path(__file__).resolve().parent
 
-TAG = "20Aug2025_v15_scouting_zbb"
-PROCESSED_PATH: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariations.pkl")
-PROCESSED_PATH_ERAS: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariations_eras.pkl")
+TAG ="26Aug2025_Full2023_v15_scouting_zbb"  # "25Aug2025_2023C_MC_ONLY_DST_MINUS_L1_DoubleJet30er2p5_Mass_Min300_dEta_Max1p5_v15_scouting_zbb" #"25Aug2025_BPix_MC_ONLY_DST_MINUS_L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5_v15_scouting_zbb" #"25Aug2025FullDST_v15_scouting_zbb" #"20Aug2025_v15_scouting_zbb"
+PROCESSED_PATH: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariationsFull.pkl")
+PROCESSED_PATH_ERAS: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariationsFull_eras.pkl")
 PROCESSED_PATH.parent.mkdir(parents=True, exist_ok=True)
 DATA_DIR: Path = Path(f"/eos/user/e/eheikkil/bbbb/skimmer/{TAG}/")
 
@@ -107,7 +109,7 @@ def parse_args():
         "--txbb-bins",
         type=float,
         nargs="+",
-        default=[0.95, 0.975, 0.99, 1.0],
+        default=[0.95, 1.0],
         help="TXbb bins (default: [0.95, 0.975, 0.99, 1.0])",
     )
 
@@ -115,7 +117,7 @@ def parse_args():
         "--pt-bins",
         type=float,
         nargs="+",
-        default=[350, 450, 550, 10000],
+        default=[550, 10000],
         help="pT bins (default: [350, 450, 550, 10000])",
     )
 
@@ -455,123 +457,12 @@ def main():
             events_combined = pd.read_pickle(f)
         print(f"Loaded events from {PROCESSED_PATH}")
 
-# 
-    # if args.reprocess or not PROCESSED_PATH.exists():
-    #     events_dict = {}
-    #     for year in YEARS:
-    #         events_dict[year] = {}
-
-    #         for sample, sample_list in SAMPLES_DICT.items():
-    #             print(f"Loading {sample} for {year}...")
-
-    #             # Build columns
-    #             triggers_cols = [(trigger, 1) for trigger in triggers[year]] if not USE_SCOUTING_VARIABLES else []
-    #             columns = triggers_cols + base_columns + extra_columns_dict.get(sample, [])
-
-    #             try:
-    #                 loaded = utils.load_samples(
-    #                     data_dir=DATA_DIR,
-    #                     samples={sample: sample_list},  # only load one sample type at a time
-    #                     year=year,
-    #                     columns=utils.format_columns(columns),
-    #                     variations=True,
-    #                     weight_shifts=["FSRPartonShower", "ISRPartonShower", "pileup"],
-    #                 )
-
-    #                 if sample not in loaded or loaded[sample].empty:
-    #                     print(f"No data loaded for {sample} in year {year}. Skipping")
-    #                     continue
-
-    #                 df = loaded[sample]
-
-    #                 # pt variations
-    #                 for pt_var in ["bbFatJetPt"] + pt_variations:
-    #                     if pt_var not in df.columns:
-    #                         for i in range(2):
-    #                             df[f"{pt_var}{i}"] = df[("bbFatJetPt", i)].copy()
-
-    #                 # mass variations
-    #                 for mass_var in [
-    #                     "bbFatJetScoutParTmassCorrectedX2p",
-    #                     "bbFatJetScoutParTmassCorrectedW2p",
-    #                     "bbFatJetScoutParTmassGeneric",
-    #                     "bbFatJetMsd"
-    #                 ] + mass_variations:
-    #                     if mass_var not in df.columns:
-    #                         for i in range(2):
-    #                             df[f"{mass_var}{i}"] = df[(mass_var.split("_")[0], i)].copy()
-
-    #                 # trigger sf, irrelevant for scouting TODO: DST?
-    #                 if not USE_SCOUTING_VARIABLES and sample != "data":
-    #                     sf, sf_up, sf_down = eval_trigger_sf(
-    #                         txbb=df[("bbFatJetParTTXbb", 0)].values,
-    #                         pt=df[("bbFatJetPt", 0)].values,
-    #                         msd=df[("bbFatJetMsd", 0)].values,
-    #                         year=year,
-    #                     )
-    #                     df["SF_trigger"] = sf
-    #                     df["SF_trigger_up"] = sf_up
-    #                     df["SF_trigger_down"] = sf_down
-
-    #                 loaded[sample] = df
-
-    #                 events_dict[year].update(loaded)
-
-    #             except Exception as e:
-    #                 print(f"Error loading {sample} for {year}: {e}")
-    #                 continue
-
-    #     # combine years
-    #     print("Combining events from different years...")
-    #     events_combined = {year: {} for year in YEARS_COMBINED_DICT}
-    #     for sample in SAMPLES_DICT:
-    #         for combined_year, year_list in YEARS_COMBINED_DICT.items():
-    #             dfs_to_concat = [
-    #                 events_dict[year][sample]
-    #                 for year in year_list
-    #                 if sample in events_dict[year]
-    #             ]
-    #             if dfs_to_concat:  # Only concat if something was loaded
-    #                 events_combined[combined_year][sample] = pd.concat(dfs_to_concat)
-
-    #     # Save combined & per-era
-    #     with PROCESSED_PATH.open("wb") as f:
-    #         pd.to_pickle(events_combined, f)
-    #     print(f"Events combined and saved to {PROCESSED_PATH}")
-
-    #     with PROCESSED_PATH_ERAS.open("wb") as f:
-    #         pd.to_pickle(events_dict, f)
-    #     print(f"Events by eras and saved to {PROCESSED_PATH_ERAS}")
-
-    #     del events_dict  # Free memory
-
-    # else:
-    #     print(f"Loading events from {PROCESSED_PATH}...")
-    #     with PROCESSED_PATH.open("rb") as f:
-    #         events_combined = pd.read_pickle(f)
-    #     print(f"Loaded events from {PROCESSED_PATH}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     # apply ZQQ corrections if needed
     if APPLY_Zto2Q_CORR:
         print("Applying Zto2Q corrections...")
         for year in YEARS_COMBINED_DICT:
             # apply corrections to the events
-            corr = corr_dict[year.replace("All", "")]["GenZPtWeight"]
+            corr = corr_dict[year.replace("BPix", "")]["GenZPtWeight"]
             GenZ_pt = events_combined[year]["Zto2Q"]["GenZPt"].to_numpy()[:, 0]
             sf_nom = corr.evaluate(GenZ_pt, "nominal")
             sf_up = corr.evaluate(GenZ_pt, "stat_up")
@@ -712,7 +603,6 @@ def main():
         jshift_keys.append(f"{var}_{ud}")
 
     weight_shifts = {
-        # TODO: Comment back in once have rerun the skimmer with pileup variations
         "pileup": postprocessing.Syst(
             samples=MC_SAMPLES_FINAL_LIST, label="Pileup", years=list(YEARS_COMBINED_DICT.keys())
         ),
