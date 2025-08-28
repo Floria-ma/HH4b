@@ -222,8 +222,9 @@ def get_scale_weights(events):
 
 class JECs:
     def __init__(self, year):
-        if year in ["2022", "2022EE", "2023", "2023BPix"]:
-            jec_compiled = package_path + "/corrections/jec_compiled.pkl.gz"
+        if year in ["2022", "2022EE", "2023", "2023BPix"]: # Temporary scouting test below
+            # jec_compiled = package_path + "/corrections/jec_compiled.pkl.gz"
+            jec_compiled = package_path + "/corrections/jec_compiled_scouting2023.pkl.gz"
         elif year in ["2016", "2016APV", "2017", "2018"]:
             jec_compiled = package_path + "/corrections/jec_compiled_run2.pkl.gz"
         else:
@@ -334,6 +335,7 @@ class JECs:
         else:
             corr_key = f"{year}mc"
 
+        print("corr_key", corr_key)
         # fatjet_factory.build gives an error if there are no jets in event
         if apply_jecs:  
             jets = self.jet_factory[jet_factory_str][corr_key].build(jets, jec_cache)
