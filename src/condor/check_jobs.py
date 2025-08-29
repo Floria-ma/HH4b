@@ -46,7 +46,8 @@ elif args.location == "cern":
     eosdir = f"/eos/user/{args.user[0]}/{args.user}/bbbb/{args.processor}/{args.tag}/{args.year}/"
 
 samples = [str(dir_path.name) for dir_path in Path(eosdir).iterdir()]
-jdls = [str(jdl.name) for jdl in Path(f"condor/{args.processor}/{args.tag}/").iterdir() if str(jdl).endswith(".jdl")]
+jdls = [str(jdl.name) for sample in samples for jdl in Path(f"condor/{args.processor}/{args.tag}/{sample}").iterdir() if str(jdl).endswith(".jdl")]
+
 
 jdl_dict = {}
 for sample in samples:
@@ -149,6 +150,6 @@ print(f"{len(missing_files)} files to re-run:")
 for f in missing_files:
     print(f)
 
-print("\nError files:")
-for f in err_files:
-    print(f)
+# print("\nError files:")
+# for f in err_files:
+#     print(f)

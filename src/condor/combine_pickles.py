@@ -61,40 +61,36 @@ if __name__ == "__main__":
     if args.outuser == "":
         args.outuser = user
 
-    tag_dir = f"/eos/uscms/store/user/{args.inuser}/HH4b/{args.processor}/{args.tag}"
+    tag_dir = f"/eos/user/e/eheikkil/bbbb/{args.processor}/{args.tag}"
     indir = f"{tag_dir}/{args.year}/"
 
-    outdir = f"/eos/uscms/store/user/{args.outuser}/HH4b/{args.processor}/{args.tag}/"
+    outdir = f"/eos/user/e/eheikkil/bbbb/{args.processor}/{args.tag}"
     os.system(f"mkdir -p {outdir}")
 
     print("Inputs directory:", indir)
     print("Outputs directory:", outdir)
 
-    files = [indir + "/" + file for file in Path.iterdir(indir) if file.endswith(".pkl")]
+    files = [str(file) for file in Path(indir).iterdir() if file.suffix == ".pkl"]
     out_dict = {}
 
     if args.r:
-        samples = [d for d in Path.iterdir(indir) if (Path(indir) / d / "pickles").is_dir()]
+        samples = [d for d in Path(indir).iterdir() if (d / "pickles").is_dir()]
 
         for sample in samples:
             print(sample)
-            pickle_path = f"{indir}/{sample}/pickles/"
-            sample_files = [
-                pickle_path + "/" + file
-                for file in Path.iterdir(pickle_path)
-                if file.endswith(".pkl")
-            ]
+            pickle_path = sample / "pickles"
+            sample_files = [str(file) for file in pickle_path.iterdir() if file.suffix == ".pkl"]
 
             if args.separate_samples:
-                out_dict[sample] = accumulate_files(sample_files)
+                out_dict[sample.name] = accumulate_files(sample_files)
             else:
                 files += sample_files
 
-    if args.separate_samples:
-        out = {args.year: out_dict}
-    else:
-        print(f"Accumulating {len(files)} files")
-        out = accumulate_files(files)
+            if args.separate_samples:
+                out = {args.year: out_dict}
+            else:
+                print(f"Accumulating {len(files)} files")
+                out = accumulate_files(files)
 
     with Path(f"{outdir}/{args.year}_{args.name}.pkl").open("wb") as f:
         pickle.dump(out, f)
