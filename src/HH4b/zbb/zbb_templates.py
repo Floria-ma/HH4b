@@ -23,19 +23,19 @@ mass_label = {
 YEARS = [
     # "2022", 
     # "2022EE", 
-    # "2023", 
-     "2023BPix"
+     "2023", 
+    # "2023BPix"
     ]
 YEARS_COMBINED_DICT: dict = {
     # "2022All": ["2022", "2022EE"],
-    "2023BPix": [
-        # "2023",
-        "2023BPix"
+    "2023": [
+         "2023",
+        #"2023BPix"
         ],
 }
 SCRIPT_DIR = Path(__file__).resolve().parent
 
-TAG ="26Aug2025_Full2023_v15_scouting_zbb"  # "25Aug2025_2023C_MC_ONLY_DST_MINUS_L1_DoubleJet30er2p5_Mass_Min300_dEta_Max1p5_v15_scouting_zbb" #"25Aug2025_BPix_MC_ONLY_DST_MINUS_L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5_v15_scouting_zbb" #"25Aug2025FullDST_v15_scouting_zbb" #"20Aug2025_v15_scouting_zbb"
+TAG =  "28Aug2025_NewJECS_v15_scouting_zbb"   # "26Aug2025_Full2023_v15_scouting_zbb"  # "25Aug2025_2023C_MC_ONLY_DST_MINUS_L1_DoubleJet30er2p5_Mass_Min300_dEta_Max1p5_v15_scouting_zbb" #"25Aug2025_BPix_MC_ONLY_DST_MINUS_L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5_v15_scouting_zbb" #"25Aug2025FullDST_v15_scouting_zbb" #"20Aug2025_v15_scouting_zbb"
 PROCESSED_PATH: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariationsFull.pkl")
 PROCESSED_PATH_ERAS: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariationsFull_eras.pkl")
 PROCESSED_PATH.parent.mkdir(parents=True, exist_ok=True)

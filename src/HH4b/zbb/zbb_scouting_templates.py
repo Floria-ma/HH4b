@@ -11,32 +11,43 @@ import pandas as pd
 
 from HH4b import postprocessing, utils
 
-YEARS = ["2023", "2023BPix"]
+YEARS = [
+    "2023",
+    #"2023BPix"
+    ]
 YEARS_COMBINED_DICT = {
-    "2023All": ["2023", "2023BPix"]
+    "2023": 
+        [
+        "2023", 
+        #"2023BPix"
+         ]
     }
 
-TAG = "13Aug2025_ScoutingDataQCDWto2QZto2Q_Full2023_wDST_v15_scouting_zbb"
+TAG = "28Aug2025_NewJECS_v15_scouting_zbb"
 DATA_DIR = f"/eos/user/e/eheikkil/bbbb/skimmer/{TAG}"
 OUTDIR = f"/eos/user/e/eheikkil/scouting/templates/{TAG}"
-PERSISTENT_PATH = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scouting_events.pkl")
+PERSISTENT_PATH = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scouting_events_withprobs.pkl")
+# PERSISTENT_PATH_ERAS = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scouting_events_withprobs_eras.pkl")
 PERSISTENT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-TXBB_BINS = [0.95, 0.975, 0.99, 1.0]
-PT_BINS = [200, 450, 550, 10000]
+# TXBB_BINS = [0.95, 0.975, 0.99, 1.0]
+# PT_BINS = [200, 450, 550, 10000]
+TXBB_BINS = [0.975, 1.0]
+PT_BINS = [550, 10000]
+
 MASS_BIN_SIZE = 5
 M_LOW = 50.0
 M_HIGH = 150.0
 
 SAMPLES_DICT = {
-    "data": ["Data"], # It is important that this d in the "data" key be lower case
+    "data": ["Run2023C", "Run2023D"], # It is important that this d in the "data" key be lower case
     "Zto2Q": ["Zto2Q-2Jets"],
     "Wto2Q": ["Wto2Q-2Jets"],
     "qcd": ["QCD"] # Same with lowercase q here
 }
 MC_SAMPLES_LIST = [k for k in SAMPLES_DICT if k != "data"]
 
-APPLY_Zto2Q_CORR = False # TIODO: Can't use right now because 2023BPix is implemented correctly but 2023 might not work? Need loop over years and clarification with combined events dict
+APPLY_Zto2Q_CORR = True # TIODO: Can't use right now because 2023BPix is implemented correctly but 2023 might not work? Need loop over years and clarification with combined events dict
 
 def categorize_zto2q(events_dict):
     for year in events_dict:
@@ -55,7 +66,7 @@ def categorize_zto2q(events_dict):
 
 def create_templates(events_dict):
     pt_branch = "bbFatJetPt0"
-    mass_branch = "bbFatJetScoutParTmassGeneric0"
+    mass_branch = "bbFatJetScoutParTmassCorrectedX2p0"
     txbb_branch = "bbFatJetScoutParTTXbb0"
 
     selection_regions = {}
@@ -89,7 +100,7 @@ def create_templates(events_dict):
 
     shape_var = postprocessing.ShapeVar(
         mass_branch,
-        r"$m_\mathrm{reg}$ (GeV)",
+        r"$m_\mathrm{X2p}$ (GeV)",
         [int((M_HIGH - M_LOW) / MASS_BIN_SIZE), M_LOW, M_HIGH],
         reg=True,
     )
@@ -143,8 +154,9 @@ def main():
         ("bbFatJetMass", 2),
         ("bbFatJetScoutParTmassGeneric", 2),
         ("bbFatJetScoutParTmassCorrectedX2p", 2),
-        ("bbFatJetScoutParTmassCorrectedW2p", 2), 
+        # ("bbFatJetScoutParTmassCorrectedW2p", 2), 
         ("bbFatJetScoutParTTXbb", 2),
+        # ("bbFatJetScoutParTPXbb", 2), # Raw probability bbFatJetScoutParTPXbb0
         # ("bbFatJetParT3massGeneric", 2), # Comment in / out if using scouting vs. offline variables NOTE: Offline vars wont work with scouting data, only MC where we added noprmal reco to scouting MC as well
         # ("bbFatJetParT3massCorrectedX2p", 2),
         # ("bbFatJetParT3massCorrectedW2p", 2), 
@@ -199,6 +211,10 @@ def main():
                 except Exception as e:
                     print(f"Error loading sample {sample} for year {year}: {e}")
 
+        # with PERSISTENT_PATH_ERAS.open("wb") as f:
+        #     pd.to_pickle(events_combined, f)
+        # print(f"Saved processed events to {PERSISTENT_PATH_ERAS}")
+
         # Combine events from different years into a single dictionary
         print("Combining events from different years...")
         events_combined = {year: {} for year in YEARS_COMBINED_DICT}
@@ -216,33 +232,71 @@ def main():
         with PERSISTENT_PATH.open("rb") as f:
             events_combined = pd.read_pickle(f)
 
-    if APPLY_Zto2Q_CORR: # TODO: Scouting analysis needs this redone? TODO: This also needs to be redone when multiple years are used, e.g. 2023 and 2023BPix
+    if APPLY_Zto2Q_CORR:
         print("Applying Z->2Q corrections from ZMuMu measurement...")
         corr_dir = Path("ZMuMu_corrs")
         corr_dict = {}
 
-        # removed loop over years
-        corr_file = corr_dir / f"corr_2023.json"
-        if not corr_file.exists():
-            raise FileNotFoundError(f"Correction file {corr_file} does not exist.")
+        for year in ["2022", "2023"]:
+            corr_file = corr_dir / f"corr_{year}.json"
+            if not corr_file.exists():
+                raise FileNotFoundError(f"Correction file {corr_file} does not exist.")
 
-        # Load the correction
-        corr = correctionlib.CorrectionSet.from_file(str(corr_file))
-        corr_dict["2023BPix"] = corr
-        print(f"Loaded correction for 2023BPix from {corr_file}")
+            # Load the correction
+            corr = correctionlib.CorrectionSet.from_file(str(corr_file))
+            corr_dict[year] = corr
+            print(f"Loaded correction for {year} from {corr_file}")
+    else:
+        corr_dict = None
+        print("Z->2Q corrections are not applied.")
 
+    if APPLY_Zto2Q_CORR: # TODO: Scouting analysis needs this redone? TODO: This also needs to be redone when multiple years are used, e.g. 2023 and 2023BPix
         print("Applying Zto2Q corrections...")
+        for year in YEARS_COMBINED_DICT:
+            # apply corrections to the events
+            corr = corr_dict[year.replace("All", "")]["GenZPtWeight"]
+            GenZ_pt = events_combined[year]["Zto2Q"]["GenZPt"].to_numpy()[:, 0]
+            sf_nom = corr.evaluate(GenZ_pt, "nominal")
+            sf_up = corr.evaluate(GenZ_pt, "stat_up")
+            sf_down = corr.evaluate(GenZ_pt, "stat_down")
+            events_combined[year]["Zto2Q"]["SF_GenZPt"] = sf_nom
+            events_combined[year]["Zto2Q"]["SF_GenZPt_up"] = sf_up
+            events_combined[year]["Zto2Q"]["SF_GenZPt_down"] = sf_down
 
-        corr = corr_dict["2023BPix"]["GenZPtWeight"]
-        GenZ_pt = events_dict["2023BPix"]["Zto2Q"]["GenZPt"].to_numpy()[:, 0] # uhhhh this should be events dict or combined dict?
-        sf_nom = corr.evaluate(GenZ_pt, "nominal")
-        events_dict["2023BPix"]["Zto2Q"]["SF_GenZPt"] = sf_nom
-
-        # apply the scale factors to the final weight
-        weight = events_dict["2023BPix"]["Zto2Q"]["finalWeight"]
-        events_dict["2023BPix"]["Zto2Q"]["finalWeight"] = weight * sf_nom
-
+            # apply the scale factors to the final weight
+            weight = events_combined[year]["Zto2Q"]["finalWeight"]
+            events_combined[year]["Zto2Q"]["finalWeight"] = weight * sf_nom
+            events_combined[year]["Zto2Q"]["weight_GenZPtUp"] = weight * sf_up
+            events_combined[year]["Zto2Q"]["weight_GenZPtDown"] = weight * sf_down
         print("Zto2Q corrections applied")
+
+
+        # print("Applying Z->2Q corrections from ZMuMu measurement...")
+        # corr_dir = Path("ZMuMu_corrs")
+        # corr_dict = {}
+
+        # # removed loop over years
+        # corr_file = corr_dir / f"corr_2023.json"
+        # if not corr_file.exists():
+        #     raise FileNotFoundError(f"Correction file {corr_file} does not exist.")
+
+        # # Load the correction
+        # corr = correctionlib.CorrectionSet.from_file(str(corr_file))
+        # corr_dict["2023BPix"] = corr
+        # print(f"Loaded correction for 2023BPix from {corr_file}")
+
+        # print("Applying Zto2Q corrections...")
+
+        # corr = corr_dict["2023BPix"]["GenZPtWeight"]
+        # GenZ_pt = events_dict["2023BPix"]["Zto2Q"]["GenZPt"].to_numpy()[:, 0] # uhhhh this should be events dict or combined dict?
+        # sf_nom = corr.evaluate(GenZ_pt, "nominal")
+        # events_dict["2023BPix"]["Zto2Q"]["SF_GenZPt"] = sf_nom
+
+        # # apply the scale factors to the final weight
+        # weight = events_dict["2023BPix"]["Zto2Q"]["finalWeight"]
+        # events_dict["2023BPix"]["Zto2Q"]["finalWeight"] = weight * sf_nom
+
+        # print("Zto2Q corrections applied")
     else:
         corr_dict = None
         print("Z->2Q corrections are not applied.")
