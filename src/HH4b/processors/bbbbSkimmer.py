@@ -1347,7 +1347,7 @@ class bbbbSkimmer(SkimmerABC):
                     "JMS_up",
                     "JMR_down",
                     "JMR_up",
-                    "JES_up",
+                    "JES_up", # These should be added in by the JECs right? 
                     "JES_down",
                     "JER_up",
                     "JER_down",
@@ -1691,9 +1691,9 @@ class bbbbSkimmer(SkimmerABC):
                 )
                 add_selection("ak8_back2back", zbb_ak8jets_dphi >= (np.pi / 2), *selection_args)
 
-                # >= 1 AK8 jet with ParT/PNet Xbb >= 0.
+                # >= 1 AK8 jet with ParT/PNet Xbb >= 0.1
                 cut_txbb = (
-                    (np.sum(bbFatJetVars["bbFatJetScoutParTTXbb"][:, :2] >= 0.3, axis=1) >= 1) # A lot higher
+                    (np.sum(bbFatJetVars["bbFatJetScoutParTTXbb"][:, :2] >= 0.1, axis=1) >= 1) # A lot higher
                     # | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1) # TODO: Ask Patin if this is needed
                 )
                
