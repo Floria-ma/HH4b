@@ -456,7 +456,7 @@ def get_ak8jets(fatjets: FatJetArray): # TODO: This is the goldmine for the vari
 
         fatjets["ScoutParTTXbb"] = (
             fatjets.scoutGlobalParT_prob_Xbb / (
-                fatjets.scoutGlobalParT_prob_Xbb + fatjets.scoutGlobalParT_prob_QCD
+                fatjets.scoutGlobalParT_prob_Xbb + fatjets.scoutGlobalParT_prob_QCD + fatjets.scoutGlobalParT_prob_Xcc + fatjets.scoutGlobalParT_prob_Xcs + fatjets.scoutGlobalParT_prob_Xgg + fatjets.scoutGlobalParT_prob_Xqq
             )
         )
 
