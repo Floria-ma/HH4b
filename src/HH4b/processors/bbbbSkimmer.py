@@ -1664,8 +1664,8 @@ class bbbbSkimmer(SkimmerABC):
                 # FatJet0 with pT>250, mSD>40
                 cut_pt_lead = (
                     np.sum(
-                        (bbFatJetVars["bbFatJetPt"][:, :2] >= 200) # Changed from 250 to 200 for scouting
-                        & (bbFatJetVars["bbFatJetMsd"][:, :2] >= 0), # Testing without M_SD cut
+                        (bbFatJetVars["bbFatJetPt"][:, :2] >= 250) # 200?
+                        & (bbFatJetVars["bbFatJetMsd"][:, :2] >= 20), # Testing without M_SD cut
                         axis=1,
                     )
                 ) >= 1
@@ -1675,7 +1675,7 @@ class bbbbSkimmer(SkimmerABC):
                 # FatJet1 with pT>200
                 cut_pt_subl = (
                     np.sum(
-                        bbFatJetVars["bbFatJetPt"][:, :2] >= 170, # Changed from 200 to 150 for scouting
+                        bbFatJetVars["bbFatJetPt"][:, :2] >= 200, # 170?
                         axis=1,
                     )
                 ) >= 2  # >=2 because we already have the lead fatjet
@@ -1694,7 +1694,7 @@ class bbbbSkimmer(SkimmerABC):
                 # >= 1 AK8 jet with ParT/PNet Xbb >= 0.1
                 cut_txbb = (
                     (np.sum(bbFatJetVars["bbFatJetScoutParTTXbb"][:, :2] >= 0.1, axis=1) >= 1)
-                    # | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1) # TODO: Ask Patin if this is needed
+                    # | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1) # I don't think this is needed in scouting
                 )
                
                 add_selection("ak8bb_txbb", cut_txbb, *selection_args)
