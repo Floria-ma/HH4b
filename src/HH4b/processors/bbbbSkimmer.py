@@ -1664,8 +1664,8 @@ class bbbbSkimmer(SkimmerABC):
                 # FatJet0 with pT>250, mSD>40
                 cut_pt_lead = (
                     np.sum(
-                        (bbFatJetVars["bbFatJetPt"][:, :2] >= 250) # 200?
-                        & (bbFatJetVars["bbFatJetMsd"][:, :2] >= 20), # Testing without M_SD cut
+                        (bbFatJetVars["bbFatJetPt"][:, :2] >= 300) # 200?
+                        & (bbFatJetVars["bbFatJetMsd"][:, :2] >= 20), # Testing lower M_SD cut and higher pT
                         axis=1,
                     )
                 ) >= 1
@@ -1700,7 +1700,7 @@ class bbbbSkimmer(SkimmerABC):
                 add_selection("ak8bb_txbb", cut_txbb, *selection_args)
 
                 # HT > 500
-                add_selection("ht500", eventVars["ht"] >= 500, *selection_args)
+                add_selection("ht500", eventVars["ht"] >= 600, *selection_args)
 
                 # top veto: no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
                 medium_btag_th_dict = { # Commented out values are for deepFlavB
