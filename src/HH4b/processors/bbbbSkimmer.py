@@ -1663,12 +1663,9 @@ class bbbbSkimmer(SkimmerABC):
                 add_selection("num_ak8jets", eventVars["nFatJets"] >= 2, *selection_args)
                 # FatJet0 with pT>250, mSD>40
                 cut_pt_lead = (
-                    np.sum(
-                        (bbFatJetVars["bbFatJetPt"][:, :2] >= 300) # 200?
-                        & (bbFatJetVars["bbFatJetMsd"][:, :2] >= 20), # Testing lower M_SD cut and higher pT
-                        axis=1,
-                    )
-                ) >= 1
+                    (bbFatJetVars["bbFatJetPt"][:, 0] >= 300)
+                    & (bbFatJetVars["bbFatJetMsd"][:, 0] >= 40) # Trying 20
+                )
                 add_selection("ak8_ptmSD_lead", cut_pt_lead, *selection_args) # Includes a cut on leading pt as well
 
                 # Commenting these out for now since we want to do inclusive production mode rn - Eetu 30/07/2025
