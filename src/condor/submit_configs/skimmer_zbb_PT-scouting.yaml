@@ -1,0 +1,98 @@
+{
+    "2023BPix": {
+        "VJets": {
+            "subsamples": [
+                # Zto2Q-2Jets samples
+                "Zto2Q-2Jets_PTQQ-100to200_1J",
+                "Zto2Q-2Jets_PTQQ-100to200_2J",
+                "Zto2Q-2Jets_PTQQ-200to400_1J",
+                "Zto2Q-2Jets_PTQQ-200to400_2J",
+                "Zto2Q-2Jets_PTQQ-400to600_1J",
+                "Zto2Q-2Jets_PTQQ-400to600_2J",
+                "Zto2Q-2Jets_PTQQ-600_1J",
+                "Zto2Q-2Jets_PTQQ-600_2J",
+                # Wto2Q-2Jets samples
+                "Wto2Q-2Jets_PTQQ-100to200_1J",
+                "Wto2Q-2Jets_PTQQ-100to200_2J",
+                "Wto2Q-2Jets_PTQQ-200to400_1J",
+                "Wto2Q-2Jets_PTQQ-200to400_2J",
+                "Wto2Q-2Jets_PTQQ-400to600_1J",
+                "Wto2Q-2Jets_PTQQ-400to600_2J",
+                "Wto2Q-2Jets_PTQQ-600_1J",
+                "Wto2Q-2Jets_PTQQ-600_2J", 
+            ],
+            "files_per_job": 10,
+            "chunksize": 8000 
+        },
+        "QCD": {
+            "subsamples": [
+                "QCD_PT-170to300", 
+                "QCD_PT-300to470",
+                "QCD_PT-470to600",
+                "QCD_PT-600to800",
+                "QCD_PT-800to1000",
+                "QCD_PT-1000to1400",
+                "QCD_PT-1800to2400",
+                "QCD_PT-1400to1800",
+                "QCD_PT-2400to3200",
+                "QCD_PT-3200",
+            ],
+            "files_per_job": 20,
+            "chunksize": 8000
+        },
+        "Data": {
+            "subsamples": ["Run2023D"
+            ],
+            "files_per_job": 1,
+            "chunksize": 1000000
+        }
+    },
+    "2023": {
+        "VJets": {
+            "subsamples": [
+                # Zto2Q-2Jets samples
+                "Zto2Q-2Jets_PTQQ-100to200_1J",
+                "Zto2Q-2Jets_PTQQ-100to200_2J",
+                "Zto2Q-2Jets_PTQQ-200to400_1J",
+                "Zto2Q-2Jets_PTQQ-200to400_2J",
+                "Zto2Q-2Jets_PTQQ-400to600_1J",
+                "Zto2Q-2Jets_PTQQ-400to600_2J",
+                "Zto2Q-2Jets_PTQQ-600_1J",
+                "Zto2Q-2Jets_PTQQ-600_2J",
+                # Wto2Q-2Jets samples
+                "Wto2Q-2Jets_PTQQ-100to200_1J",
+                "Wto2Q-2Jets_PTQQ-100to200_2J",
+                "Wto2Q-2Jets_PTQQ-200to400_1J",
+                "Wto2Q-2Jets_PTQQ-200to400_2J",
+                "Wto2Q-2Jets_PTQQ-400to600_1J",
+                "Wto2Q-2Jets_PTQQ-400to600_2J",
+                "Wto2Q-2Jets_PTQQ-600_1J",
+                "Wto2Q-2Jets_PTQQ-600_2J",
+            ],
+            "files_per_job": 10,
+            "chunksize": 8000 
+        },
+        "QCD": {
+            "subsamples": [
+                "QCD_PT-170to300", 
+                "QCD_PT-300to470",
+                "QCD_PT-470to600",
+                "QCD_PT-600to800",
+                "QCD_PT-800to1000",
+                "QCD_PT-1000to1400",
+                "QCD_PT-1800to2400",
+                "QCD_PT-1400to1800",
+                "QCD_PT-2400to3200",
+                "QCD_PT-3200",
+            ],
+            "files_per_job": 20,
+            "chunksize": 8000
+        },
+        "Data": {
+            "subsamples": ["Run2023C"
+            ],
+            "files_per_job": 1,
+            "chunksize": 1000000
+        }
+    }
+}
