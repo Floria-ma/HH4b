@@ -24,7 +24,7 @@ YEARS = [
     # "2022", 
     # "2022EE", 
      "2023", 
-    # "2023BPix"
+    #2023BPix"
     ]
 YEARS_COMBINED_DICT: dict = {
     # "2022All": ["2022", "2022EE"],
@@ -35,7 +35,7 @@ YEARS_COMBINED_DICT: dict = {
 }
 SCRIPT_DIR = Path(__file__).resolve().parent
 
-TAG =  "28Aug2025_NewJECS_v15_scouting_zbb"   # "26Aug2025_Full2023_v15_scouting_zbb"  # "25Aug2025_2023C_MC_ONLY_DST_MINUS_L1_DoubleJet30er2p5_Mass_Min300_dEta_Max1p5_v15_scouting_zbb" #"25Aug2025_BPix_MC_ONLY_DST_MINUS_L1_DoubleJet30er2p5_Mass_Min250_dEta_Max1p5_v15_scouting_zbb" #"25Aug2025FullDST_v15_scouting_zbb" #"20Aug2025_v15_scouting_zbb"
+TAG =  "23Oct2025_v15_scouting_zbb"  
 PROCESSED_PATH: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariationsFull.pkl")
 PROCESSED_PATH_ERAS: Path = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scoutingwithvariationsFull_eras.pkl")
 PROCESSED_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -192,8 +192,8 @@ def main():
         fatjet_vars += fatjet_vars_ScoutGloParT
 
     pt_variations = []
-    for jesr, ud in itertools.product(["JES", "JER"], ["up", "down"]):
-        pt_variations.append(f"bbFatJetPt_{jesr}_{ud}")
+    #for jesr, ud in itertools.product(["JES", "JER"], ["up", "down"]):
+    #    pt_variations.append(f"bbFatJetPt_{jesr}_{ud}")
 
     mass_variations = []
     if not USE_SCOUTING_VARIABLES:
@@ -241,6 +241,7 @@ def main():
 
     # TODO: pt variations not done in bbbbSkimmer right now, fix!
     load_columns_pt_var = []
+
     for pt_var in pt_variations:
         load_columns_pt_var.append((pt_var, 2))
 
@@ -268,7 +269,7 @@ def main():
     print(f"Extra columns: {extra_columns_dict}")
 
     # Trigger efficiency corrections
-    if not USE_SCOUTING_VARIABLES: # One would have to do this for the DST trigger which we are using?
+    if not USE_SCOUTING_VARIABLES: # One would have to do this for the DST trigger which we are using? Patin has it done?
         trigger_eff_txbb = {
             year: correctionlib.CorrectionSet.from_file(
                 str(trigger_sf_dir / f"fatjet_triggereff_{year}_txbbGloParT_QCD.json")
@@ -370,14 +371,16 @@ def main():
                 columns = triggers_cols + base_columns + extra_columns_dict.get(sample, [])
                 
                 try:
+                    print("Loading sample", sample)
+                    
                     loaded = utils.load_samples(
                         data_dir=DATA_DIR,
                         samples={sample: sample_list},  # only load one sample type at a time
                         year=year,
                         columns=utils.format_columns(columns),
                         variations=True,
-                        weight_shifts=["FSRPartonShower", "ISRPartonShower", "pileup"],
-                        # load_weight_noxsec=True
+                        weight_shifts=["FSRPartonShower", "ISRPartonShower", "pileup", "pdf"],
+                        # load_weight_noxsec=True # Is this the important line?
                     )
                     
                     if sample not in loaded or loaded[sample].empty:
@@ -386,11 +389,15 @@ def main():
                         continue
 
                     df = loaded[sample]
-            
                     for pt_var in ["bbFatJetPt"] + pt_variations:
-                        if pt_var not in df.columns:
+                        if not any(col[0] == pt_var for col in df.columns):
                             for i in range(2):
-                                df[f"{pt_var}{i}"] = df[("bbFatJetPt", i)].copy()
+                                df[(pt_var, i)] = df[("bbFatJetPt", i)].copy()
+
+                    #for pt_var in ["bbFatJetPt"] + pt_variations:
+                    #    if pt_var not in df.columns:
+                    #        for i in range(2):
+                    #            df[f"{pt_var}{i}"] = df[("bbFatJetPt", i)].copy()
 
                     # if mass variations are not present, set them to mass
                     for mass_var in [
@@ -401,7 +408,7 @@ def main():
                         "bbFatJetScoutParTmassGeneric",
                         "bbFatJetMsd"
                     ] + mass_variations:
-                        if mass_var not in df.columns: # Does "var" here mean "variable" or "variation"?
+                        if mass_var not in df.columns:
                             for i in range(2):
                                 df[f"{mass_var}{i}"] = df[(mass_var.split("_")[0], i)].copy()
 
@@ -599,14 +606,15 @@ def main():
     bg_order = list(reversed(bkg_keys))
 
     jshift_keys = [""]
-    for var, ud in itertools.product(["JES", "JER", "JMS", "JMR"], ["up", "down"]): 
+    # NOTE: Commented out JES/JER (need to add back into the JMS/JMR list when pT variations can be done!
+    for var, ud in itertools.product(["JMS", "JMR"], ["up", "down"]): 
         jshift_keys.append(f"{var}_{ud}")
 
     weight_shifts = {
         "pileup": postprocessing.Syst(
             samples=MC_SAMPLES_FINAL_LIST, label="Pileup", years=list(YEARS_COMBINED_DICT.keys())
         ),
-        # "pdf": postprocessing.Syst(samples=sig_keys, label="PDFAcc", years=list(YEARS_COMBINED_DICT.keys())),
+        "pdf": postprocessing.Syst(samples=sig_keys, label="PDFAcc", years=list(YEARS_COMBINED_DICT.keys())),
         "ISRPartonShower": postprocessing.Syst(
             samples=MC_SAMPLES_FINAL_LIST,
             label="ISR Parton Shower",

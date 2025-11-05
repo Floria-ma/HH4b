@@ -44,10 +44,12 @@ from HH4b.postprocessing.datacardHelpers import (
 )
 
 # TXbb scale factor measurement binning
-WPS = [0.95, 0.975, 0.99, 1.0]
-PTS = [350, 450, 550, 10000]
+#WPS = [0.95, 0.975, 0.99, 1.0]
+#PTS = [350, 450, 550, 10000]
 # PTS = [350, 450, 500, 550, 10000]
 
+WPS = [0.975, 1.0]
+PTS = [550, 10000]
 pt_strs = [str(pt) for pt in PTS]
 pt_bins = list(zip(pt_strs[:-1], pt_strs[1:]))
 
@@ -120,7 +122,7 @@ parser.add_argument(
     "--year",
     type=str,
     required=True,
-    choices=["2022All", "2023All"],
+    choices=["2022All", "2023All", "2023BPix", "2023"],
     help="years to make datacards for",
 )
 add_bool_arg(parser, "mcstats", "add mc stats nuisances", default=True)
@@ -133,7 +135,7 @@ add_bool_arg(
     default=False,
 )
 add_bool_arg(parser, "jmsr", "Do JMS/JMR uncertainties", default=True)
-add_bool_arg(parser, "jesr", "Do JES/JER uncertainties", default=True)
+add_bool_arg(parser, "jesr", "Do JES/JER uncertainties", default=False)
 args = parser.parse_args()
 
 
@@ -155,8 +157,8 @@ print(f"nTF orders: {args.nTF}")
 # (name in templates, name in cards)
 mc_samples = OrderedDict(
     [
-        ("ttbar", "ttbar"),
-        ("hbb", "hbb"),
+        #("ttbar", "ttbar"),
+        #("hbb", "hbb"),
         ("Wto2Q", "Wto2Q"),
         ("Zto2Q_CC", "Zto2Q_CC"),
         ("Zto2Q_QQ", "Zto2Q_QQ"),
@@ -194,13 +196,13 @@ jmsr_keys = list(dict.fromkeys(jmsr_keys))
 
 # dictionary of nuisance params -> (modifier, samples affected by it, value)
 nuisance_params = {
-    "pdf_gg": Syst(prior="lnN", samples=["ttbar"], value=1.042),
-    "QCDscale_ttbar": Syst(
-        prior="lnN",
-        samples=["ttbar"],
-        value=1.024,
-        value_down=0.965,
-    ),
+    #"pdf_gg": Syst(prior="lnN", samples=["ttbar"], value=1.042), # These two shouldn't do anything right?
+    #"QCDscale_ttbar": Syst(
+    #    prior="lnN",
+    #    samples=["ttbar"],
+    #    value=1.024,
+    #    value_down=0.965,
+    #),
     # weight lumi uncertainties by corresponding integrated lumi
     "lumi_2022": Syst(
         prior="lnN", samples=all_mc, value=1 + 0.014 * LUMI["2022All"] / LUMI["2022-2023"]
@@ -208,17 +210,43 @@ nuisance_params = {
     "lumi_2023": Syst(
         prior="lnN", samples=all_mc, value=1 + 0.013 * LUMI["2023All"] / LUMI["2022-2023"]
     ),
+    "lumi_2023C": Syst(
+        prior="lnN", samples=all_mc, value=1 + 0.013 * LUMI["2023"] / LUMI["2022-2023"] # I guess dividing by 2022-2023 is fair? I am not sure about these systematics
+    ),
+    "lumi_2023D": Syst(
+        prior="lnN", samples=all_mc, value=1 + 0.013 * LUMI["2023BPix"] / LUMI["2022-2023"] # I guess dividing by 2022-2023 is fair? I am not sure about these systematics; should it just be 2023All in lumi denom?
+    )
+
+    # Naming scheme above is absolutely fucked, why is lumi_2023 for whole of 2023; we have been splitting 2023 into "2023" and "2023BPix" so far god damn
 }
 
 if args.year == "2022All":
     del nuisance_params["lumi_2023"]
+    del nuisance_params["lumi_2023C"]
+    del nuisance_params["lumi_2023D"]
     uncorr_years = {
         "2022All": ["2022All"],
     }
 elif args.year == "2023All":
     del nuisance_params["lumi_2022"]
+    del nuisance_params["lumi_2023C"]
+    del nuisance_params["lumi_2023D"]
     uncorr_years = {
         "2023All": ["2023All"],
+    }
+elif args.year == "2023BPix":
+    del nuisance_params["lumi_2022"]
+    del nuisance_params["lumi_2023"]
+    del nuisance_params["lumi_2023C"]
+    uncorr_years = {
+        "2023BPix": ["2023BPix"],
+    }
+elif args.year == "2023":
+    del nuisance_params["lumi_2022"]
+    del nuisance_params["lumi_2023"]
+    del nuisance_params["lumi_2023D"]
+    uncorr_years = {
+        "2023": ["2023"],
     }
 else:
     raise ValueError(f"Invalid year {args.year}, must be one of ['2022All', '2023All']")
