@@ -1664,7 +1664,7 @@ class bbbbSkimmer(SkimmerABC):
                 # FatJet0 with pT>250, mSD>40
                 cut_pt_lead = (
                     (bbFatJetVars["bbFatJetPt"][:, 0] >= 300)
-                    & (bbFatJetVars["bbFatJetMsd"][:, 0] >= 40) # Trying 20
+                    & (bbFatJetVars["bbFatJetMsd"][:, 0] >= 30) # Trying 20
                 )
                 add_selection("ak8_ptmSD_lead", cut_pt_lead, *selection_args) # Includes a cut on leading pt as well
 
