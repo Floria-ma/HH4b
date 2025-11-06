@@ -256,12 +256,15 @@ def _normalize_weights(
     events["finalWeight"] = events["weight"] / totals["np_nominal"]
 
     if not variations:
+        if weight_shifts is not None:
+            print("Weight shifts provided but variations set to false. Note that this will not normalize the variations")
         return
 
     if weight_shifts is None:
         raise ValueError(
             "Variations requested but no weight shifts given! Please use ``variations=False`` or provide the systematics to be normalized."
         )
+    
 
     # normalize all the variations
     for wvar in weight_shifts:
@@ -375,6 +378,7 @@ def load_samples(
 
                 pickles = get_pickles(sample_path / "pickles", year, sample)
                 if "totals" in pickles:
+                    print("Normalizing using pickles")
                     totals = pickles["totals"]
                     _normalize_weights(
                         events,
