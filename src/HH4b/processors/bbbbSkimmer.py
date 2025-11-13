@@ -861,9 +861,9 @@ class bbbbSkimmer(SkimmerABC):
             events.Jet if not self.use_scouting else events.ScoutingPFJetRecluster, # If we use scouting we use ScoutingPFJetRecluster
             year,
             isData,
-            jecs=self.jecs, # if not self.use_scouting else None, # No variations for scouting rn
+            jecs=self.jecs,
             fatjets=False,
-            applyData=True, # Apply corrections to data
+            applyData=True,
             dataset=dataset,
             nano_version=self._nano_version,
             use_scouting=self.use_scouting,
@@ -937,7 +937,7 @@ class bbbbSkimmer(SkimmerABC):
             fatjets,
             year,
             isData,
-            jecs=self.jecs,# if not self.use_scouting else None, # no variations for scouting rn
+            jecs=self.jecs,
             fatjets=True,
             applyData=True,
             dataset=dataset,
@@ -1036,7 +1036,7 @@ class bbbbSkimmer(SkimmerABC):
                 jms_values=self.jms_values[year],
                 jmr_values=self.jmr_values[year],
                 isData=isData,
-            ) # Appears that this cannot be done for scouting right now because scouting glopartv3 is not in jms_values dictionary
+            )
 
         #########################
         # Save / derive variables
