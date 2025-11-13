@@ -1,0 +1,81 @@
+{
+    "2023BPix": {
+        "VJetsLO": {
+            "subsamples": [
+                # Zto2Q-2Jets samples
+                "Zto2Q-4Jets_HT-200to400",
+                "Zto2Q-4Jets_HT-400to600",
+                "Zto2Q-4Jets_HT-600to800",
+                "Zto2Q-4Jets_HT-800",
+                # Wto2Q-3Jets-HT samples (LO)
+                "Wto2Q-3Jets_HT-200to400",
+                "Wto2Q-3Jets_HT-400to600",
+                "Wto2Q-3Jets_HT-600to800",
+                "Wto2Q-3Jets_HT-800"
+            ],
+            "files_per_job": 5,
+            "chunksize": 8000 
+        },
+        "QCD": {
+            "subsamples": [
+                "QCD_PT-170to300", 
+                "QCD_PT-300to470",
+                "QCD_PT-470to600",
+                "QCD_PT-600to800",
+                "QCD_PT-800to1000",
+                "QCD_PT-1000to1400",
+                "QCD_PT-1800to2400",
+                "QCD_PT-1400to1800",
+                "QCD_PT-2400to3200",
+                "QCD_PT-3200",
+            ],
+            "files_per_job": 5,
+            "chunksize": 8000
+        },
+        "JetMET": {
+            "subsamples": ["Run2023D-22Sep2023_v1-v1_DAZSLE_PFNano"
+            ],
+            "files_per_job": 1
+        }
+    },
+    "2023": {
+        "VJetsLO": {
+            "subsamples": [
+                # Zto2Q-2Jets samples
+                "Zto2Q-4Jets_HT-200to400",
+                "Zto2Q-4Jets_HT-400to600",
+                "Zto2Q-4Jets_HT-600to800",
+                "Zto2Q-4Jets_HT-800",
+                # Wto2Q-3Jets-HT samples (LO)
+                "Wto2Q-3Jets_HT-200to400",
+                "Wto2Q-3Jets_HT-400to600",
+                "Wto2Q-3Jets_HT-600to800",
+                "Wto2Q-3Jets_HT-800"
+            ],
+            "files_per_job": 5,
+            "chunksize": 8000 
+        },
+        "QCD": {
+            "subsamples": [
+                "QCD_PT-170to300", 
+                "QCD_PT-300to470",
+                "QCD_PT-470to600",
+                "QCD_PT-600to800",
+                "QCD_PT-800to1000",
+                "QCD_PT-1000to1400",
+                "QCD_PT-1800to2400",
+                "QCD_PT-1400to1800",
+                "QCD_PT-2400to3200",
+                "QCD_PT-3200",
+            ],
+            "files_per_job": 5,
+            "chunksize": 8000
+        },
+        "JetMET": {
+            "subsamples": ["Run2023C-22Sep2023_v1-v1_DAZSLE_PFNano"
+            ],
+            "files_per_job": 1
+        }
+    }
+}
+# Need to add TT samples
