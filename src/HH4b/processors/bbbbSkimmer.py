@@ -832,7 +832,7 @@ class bbbbSkimmer(SkimmerABC):
         selection_args = (selection, cutflow, isData, gen_weights)
 
         # JEC factory loader
-        JEC_loader = JECs(year)
+        JEC_loader = JECs(year = year, use_scouting=self.use_scouting)
         print(year)
 
         #########################
@@ -1347,7 +1347,7 @@ class bbbbSkimmer(SkimmerABC):
                     "JMS_up",
                     "JMR_down",
                     "JMR_up",
-                    "JES_up", # These should be added in by the JECs right? 
+                    "JES_up",
                     "JES_down",
                     "JER_up",
                     "JER_down",
@@ -1584,8 +1584,8 @@ class bbbbSkimmer(SkimmerABC):
                 # FatJet0 with pT>250, mSD>40
                 cut_pt_lead = (
                     np.sum(
-                        (bbFatJetVars["bbFatJetPt"][:, :2] >= 250)
-                        & (bbFatJetVars["bbFatJetMsd"][:, :2] >= 40), 
+                        (bbFatJetVars["bbFatJetPt"][:, :2] >= 300)
+                        & (bbFatJetVars["bbFatJetMsd"][:, :2] >= 20), 
                         axis=1,
                     )
                 ) >= 1

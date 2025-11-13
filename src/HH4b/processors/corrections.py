@@ -221,10 +221,13 @@ def get_scale_weights(events):
 
 
 class JECs:
-    def __init__(self, year):
+    def __init__(self, year, use_scouting = False):
         if year in ["2022", "2022EE", "2023", "2023BPix"]: # Temporary scouting test below
             # jec_compiled = package_path + "/corrections/jec_compiled.pkl.gz"
-            jec_compiled = package_path + "/corrections/jec_compiled_scouting2023.pkl.gz"
+            if not use_scouting:
+                jec_compiled = package_path + "/corrections/jec_compiled.pkl.gz"
+            else:
+                jec_compiled = package_path + "/corrections/jec_compiled_scouting2023.pkl.gz"
         elif year in ["2016", "2016APV", "2017", "2018"]:
             jec_compiled = package_path + "/corrections/jec_compiled_run2.pkl.gz"
         else:
@@ -340,7 +343,6 @@ class JECs:
         if apply_jecs:  
             jets = self.jet_factory[jet_factory_str][corr_key].build(jets, jec_cache)
 
-        print("Made it to before shifts")
         # return only jets if no variations are given
         if jecs is None or isData:
             return jets, None
@@ -355,8 +357,6 @@ class JECs:
                             tdict[f"{key}_{var}"] = jets[shift][var][jec_var]
             jec_shifted_vars[jec_var] = tdict
 
-        print("HERE COME THE JEC SHIFTED VARS!!!!!!!!!!!!!!!!!!")
-        print(jec_shifted_vars)
         return jets, jec_shifted_vars
 
 
