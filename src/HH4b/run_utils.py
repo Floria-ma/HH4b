@@ -34,7 +34,9 @@ def add_mixins(nanoevents):
     nanoevents.PFNanoAODSchema.mixins["SV"] = "PFCand"
     nanoevents.PFNanoAODSchema.mixins["ScoutingFatPFJetRecluster"] = "FatJet"
     nanoevents.PFNanoAODSchema.mixins["ScoutingPFJetRecluster"] = "Jet"
-    nanoevents.PFNanoAODSchema.all_cross_references["ScoutingFatPFJetRecluster_genJetAK8Idx"] = "GenJetAK8"
+    nanoevents.PFNanoAODSchema.all_cross_references["ScoutingFatPFJetRecluster_genJetAK8Idx"] = (
+        "GenJetAK8"
+    )
     nanoevents.PFNanoAODSchema.all_cross_references["ScoutingPFJetRecluster_genJetIdx"] = "GenJet"
 
 
@@ -77,6 +79,7 @@ def check_branch(git_branch: str, git_user: str = "LPC-HH", allow_diff_local_rep
         else:
             print_red("Exiting! Use the --allow-diff-local-repo option to override this.")
             sys.exit(1)
+
 
 # TODO: Make this work for scouting + nano v15
 def get_fileset(
@@ -149,7 +152,7 @@ def get_processor(
             region=region,
             nano_version=nano_version,
             txbb=txbb,
-            use_scouting=use_scouting
+            use_scouting=use_scouting,
         )
 
     if processor == "ttSkimmer":
@@ -175,7 +178,7 @@ def parse_common_args(parser):
         help="year",
         type=str,
         default="2022",
-        choices=["2018", "2022", "2022EE", "2023", "2023BPix"],
+        choices=["2018", "2022", "2022EE", "2023", "2023BPix", "2024"],
     )
     parser.add_argument(
         "--txbb",

@@ -14,11 +14,11 @@
                 "Wto2Q-3Jets_HT-800"
             ],
             "files_per_job": 5,
-            "chunksize": 8000 
+            "chunksize": 8000
         },
         "QCD": {
             "subsamples": [
-                "QCD_PT-170to300", 
+                "QCD_PT-170to300",
                 "QCD_PT-300to470",
                 "QCD_PT-470to600",
                 "QCD_PT-600to800",
@@ -53,11 +53,11 @@
                 "Wto2Q-3Jets_HT-800"
             ],
             "files_per_job": 5,
-            "chunksize": 8000 
+            "chunksize": 8000
         },
         "QCD": {
             "subsamples": [
-                "QCD_PT-170to300", 
+                "QCD_PT-170to300",
                 "QCD_PT-300to470",
                 "QCD_PT-470to600",
                 "QCD_PT-600to800",

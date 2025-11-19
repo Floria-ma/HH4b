@@ -77,7 +77,7 @@ txbbstr_to_branch = {
     "pnet-legacy": "TXbb_legacy",
     "pnet-v12": "Txbb",
     "glopart-v2": "ParTTXbb",
-    "glopart-v3": "ParT3TXbb", 
+    "glopart-v3": "ParT3TXbb",
     "glopart-scouting": "ScoutParTTXbb",  # scouting version of glopart-v3
 }
 
@@ -85,8 +85,8 @@ txbbstr_to_branch = {
 txbbstr_to_skimmer = {
     "pnet-legacy": "PNetTXbbLegacy",
     "pnet-v12": "PNetTXbb",
-    "glopart-v2": "ParTTXbb", 
-    "glopart-v3": "ParT3TXbb", 
+    "glopart-v2": "ParTTXbb",
+    "glopart-v3": "ParT3TXbb",
     "glopart-scouting": "ScoutParTTXbb",
 }
 # TODO: Figure out what is the purpose of these, they are redefined inside the bbbbSkimmer class definition?
@@ -109,6 +109,7 @@ logger.setLevel(logging.INFO)
 
 package_path = str(pathlib.Path(__file__).parent.parent.resolve())
 
+
 class bbbbSkimmer(SkimmerABC):
     """
     Skims nanoaod files, saving selected branches and events passing preselection cuts
@@ -126,8 +127,8 @@ class bbbbSkimmer(SkimmerABC):
             "btagPNetCvL": "btagPNetCvL",
             "btagPNetQvG": "btagPNetQvG",
         },
-        "ScoutingPFJetRecluster": { 
-            **P4, 
+        "ScoutingPFJetRecluster": {
+            **P4,
             # Variables below not needed / also do not exist?
             # "scoutGlobalParT_prob_QCD": "ScoutParTPQCD",
             # "scoutGlobalParT_prob_Xbb": "ScoutParTPXbb",
@@ -143,7 +144,7 @@ class bbbbSkimmer(SkimmerABC):
             **P4,
             "id": "Id",
         },
-        "FatJet": { # TODO: Likely have to edit this if I want the glopartv3 to work well. What should it be after skimming though?
+        "FatJet": {  # TODO: Likely have to edit this if I want the glopartv3 to work well. What should it be after skimming though?
             **P4,
             "msoftdrop": "Msd",
             "Txbb": "PNetTXbb",  # these are discriminants
@@ -158,7 +159,7 @@ class bbbbSkimmer(SkimmerABC):
             "rawFactor": "rawFactor",
         },
         "ScoutingFatPFJetRecluster": {
-            **P4, 
+            **P4,
             "msoftdrop": "Msd",
             "particleNet_mass": "PNetMass",
             # "ScoutParTTXbb": "ScoutParTTXbb", # These are extra variables so get added in extra_vars
@@ -197,8 +198,8 @@ class bbbbSkimmer(SkimmerABC):
         "pnet-legacy": 0.8,
         "pnet-v12": 0.3,
         "glopart-v2": 0.3,
-        "glopart-v3": 0.3, 
-        "glopart-scouting": 0.3 # TODO: What should this be?, doesn't matter, this is only for signal region and not getting called at all rn - 30/07/2025 Eetu
+        "glopart-v3": 0.3,
+        "glopart-scouting": 0.3,  # TODO: What should this be?, doesn't matter, this is only for signal region and not getting called at all rn - 30/07/2025 Eetu
     }
 
     fatjet_selection = {  # noqa: RUF012
@@ -215,9 +216,9 @@ class bbbbSkimmer(SkimmerABC):
         "mreg": 0,
     }
 
-    zbb_fatjet_scouting_selection = {  
-        "pt": 150, # lower pt bound to 150 for scouting fatjet
-        "eta": 2.2, # Changed to 2.2 from 2.4, source Patin
+    zbb_fatjet_scouting_selection = {
+        "pt": 150,  # lower pt bound to 150 for scouting fatjet
+        "eta": 2.2,  # Changed to 2.2 from 2.4, source Patin
         "msd": 0,
         "mreg": 0,
     }
@@ -279,7 +280,7 @@ class bbbbSkimmer(SkimmerABC):
         use_scouting=False,
     ):
         super().__init__()
-        
+
         self.XSECS = xsecs if xsecs is not None else {}  # in pb
         self.txbb = txbb
         self.use_scouting = use_scouting
@@ -288,18 +289,19 @@ class bbbbSkimmer(SkimmerABC):
         DSTs = {
             "zbb": {
                 "2023": [
-                    "Run3_JetHT_PFScoutingPixelTracking", # Hotfix following https://codimd.web.cern.ch/D8_9OfwlSF66qkbBy6sjkg applied in code
+                    "Run3_JetHT_PFScoutingPixelTracking",  # Hotfix following https://codimd.web.cern.ch/D8_9OfwlSF66qkbBy6sjkg applied in code
                 ],
                 "2023BPix": [
                     "Run3_JetHT_PFScoutingPixelTracking",
                 ],
                 "2024": [
-                    "DST_PFScouting_JetHT", 
+                    "DST_PFScouting_JetHT",
                 ],
             }
         }
 
-        if self.use_scouting: self.DSTs = DSTs[region] 
+        if self.use_scouting:
+            self.DSTs = DSTs[region]
 
         # HLT selection
         HLTs = {
@@ -339,6 +341,13 @@ class bbbbSkimmer(SkimmerABC):
                     "AK8PFJet425_SoftDropMass40",
                     "AK8PFJet400_SoftDropMass40",
                     "AK8PFJet420_MassSD30",
+                ],
+                "2024": [
+                    "AK8PFJet500",
+                    "AK8PFJet400_SoftDropMass30",
+                    # Not available in 2024: AK8PFJet420_MassSD30, AK8PFJet425_SoftDropMass40
+                    "AK8PFJet425_SoftDropMass30",
+                    "AK8PFJet230_SoftDropMass40_PNetBB0p06",
                 ],
             },
             # TODO: add semiboosted HLT
@@ -454,6 +463,13 @@ class bbbbSkimmer(SkimmerABC):
                     "AK8PFJet425_SoftDropMass40",
                     "AK8PFJet230_SoftDropMass40_PNetBB0p06",
                 ],
+                "2024": [
+                    "AK8PFJet500",
+                    # "AK8PFJet420_MassSD30",
+                    "AK8PFJet425_SoftDropMass30",
+                    "AK8PFJet250_SoftDropMass40_PNetBB0p06",  # "HLT_AK8PFJet250_SoftDropMass40_PNetBB0p10"
+                    "AK8PFJet230_SoftDropMass40_PNetBB0p10",
+                ],
             },
             "zbb-DYLL-data": {
                 "2022": [
@@ -468,12 +484,16 @@ class bbbbSkimmer(SkimmerABC):
                 "2023BPix": [
                     "Mu50",
                 ],
+                "2024": [
+                    "Mu50",
+                ],
             },
             "zbb-Zto2Q-DYLL": {
                 "2022": [],
                 "2022EE": [],
                 "2023": [],
                 "2023BPix": [],
+                "2024": [],
             },
         }
         HLTs["pre-sel"] = HLTs["signal"]
@@ -536,7 +556,7 @@ class bbbbSkimmer(SkimmerABC):
 
         if self._region == "zbb":
             # update fatjet selection for Zbb region
-            gen_selection_dict["Zto2Q-"] = gen_selection_ZbbSF_ZQQ 
+            gen_selection_dict["Zto2Q-"] = gen_selection_ZbbSF_ZQQ
             gen_selection_dict["Wto2Q-"] = gen_selection_ZbbSF_WQQ
         # Correction measurement for Zbb SF
         elif self._region == "zbb-Zto2Q-DYLL":
@@ -558,9 +578,12 @@ class bbbbSkimmer(SkimmerABC):
         else:
             self.bdt_model = None
 
-        # TODO: is this only needed for BDT? 
+        # TODO: is this only needed for BDT?
         # JMSR
-        self.jmsr_vars = ["msoftdrop", "particleNet_mass"] # if not self.use_scouting else ["msoftdrop"] # Why are we using particleNet_mass here? Can I just take it away?
+        self.jmsr_vars = [
+            "msoftdrop",
+            "particleNet_mass",
+        ]  # if not self.use_scouting else ["msoftdrop"] # Why are we using particleNet_mass here? Can I just take it away?
         if self._nano_version == "v12v2_private":
             self.jmsr_vars += ["particleNet_mass_legacy", "ParTmassVis"]
         if self._nano_version == "v12_private":
@@ -568,7 +591,7 @@ class bbbbSkimmer(SkimmerABC):
         if self._nano_version == "v14_25v2":
             self.jmsr_vars += [
                 "particleNet_mass_legacy",
-                "ParT2massVis", 
+                "ParT2massVis",
                 "ParT2massRes",
                 "ParT3massGeneric",
                 "ParT3massCorrectedX2p",
@@ -579,23 +602,29 @@ class bbbbSkimmer(SkimmerABC):
         #         "ParT3massGeneric",
         #         "ParT3massCorrX2p",
         #     ]
-        if self._nano_version == "v15_scouting": # TODO: What variables to put here? @Patin @Santeri
+        if (
+            self._nano_version == "v15_scouting"
+        ):  # TODO: What variables to put here? @Patin @Santeri
             if self.use_scouting:
                 self.jmsr_vars += [
                     "ScoutParTmassGeneric",
-                    "ScoutParTmassCorrectedX2p", 
+                    "ScoutParTmassCorrectedX2p",
                 ]
                 # pass
             else:
                 self.jmsr_vars += [
                     "ParT3massGeneric",
-                    "ParT3massCorrectedX2p", 
+                    "ParT3massCorrectedX2p",
                 ]
-        
-        self.jms_values = dict.fromkeys(["2022", "2022EE", "2023", "2023BPix"]) # TODO: If we are not doing JECs for scouting, does one need to worry about this? A: We can do JECs but not worry about variations
-        self.jmr_values = dict.fromkeys(["2022", "2022EE", "2023", "2023BPix"])
+
+        self.jms_values = dict.fromkeys(
+            ["2022", "2022EE", "2023", "2023BPix", "2024"]
+        )  # TODO: If we are not doing JECs for scouting, does one need to worry about this? A: We can do JECs but not worry about variations
+        self.jmr_values = dict.fromkeys(["2022", "2022EE", "2023", "2023BPix", "2024"])
         for jmsr_year in self.jms_values:
-            jmr_val = HH4b.hh_vars.jmsr_values["bbFatJetParTmassVis"]["JMR"][jmsr_year] # TODO: Wtf is this jmsr values dictionary
+            jmr_val = HH4b.hh_vars.jmsr_values["bbFatJetParTmassVis"]["JMR"][
+                jmsr_year
+            ]  # TODO: Wtf is this jmsr values dictionary
             jms_val = HH4b.hh_vars.jmsr_values["bbFatJetParTmassVis"]["JMS"][jmsr_year]
 
             if self.use_scouting and self._nano_version == "v15_scouting":
@@ -614,7 +643,11 @@ class bbbbSkimmer(SkimmerABC):
             self.jms_values[jmsr_year] = dict.fromkeys(self.jmsr_vars)
             # default no scaling/smearing
             for jmsr_var in self.jmsr_vars:
-                self.jmr_values[jmsr_year][jmsr_var] = [1, 1, 1] # Energies corrected but not masses or the standard ones?
+                self.jmr_values[jmsr_year][jmsr_var] = [
+                    1,
+                    1,
+                    1,
+                ]  # Energies corrected but not masses or the standard ones?
                 self.jms_values[jmsr_year][jmsr_var] = [1, 1, 1]
             # update values for ParTmassVis # TODO What are these??? Scouting significance?
             self.jmr_values[jmsr_year]["ParTmassVis"] = [
@@ -638,7 +671,9 @@ class bbbbSkimmer(SkimmerABC):
                     jms_val["down"],
                     jms_val["up"],
                 ]
-            if self._nano_version == "v15_scouting": # Are the bbFatJetParTmassVis values valid for scouting??
+            if (
+                self._nano_version == "v15_scouting"
+            ):  # Are the bbFatJetParTmassVis values valid for scouting??
                 if self.use_scouting:
                     self.jmr_values[jmsr_year]["ScoutParTmassGeneric"] = [
                         jmr_val["nom"],
@@ -650,7 +685,7 @@ class bbbbSkimmer(SkimmerABC):
                         jmr_val["down"],
                         jmr_val["up"],
                     ]
-                else: # haven't tested
+                else:  # haven't tested
                     self.jmr_values[jmsr_year]["ParT3massGeneric"] = [
                         jmr_val["nom"],
                         jmr_val["down"],
@@ -661,7 +696,6 @@ class bbbbSkimmer(SkimmerABC):
                         jmr_val["down"],
                         jmr_val["up"],
                     ]
-
 
         # FatJet Vars
         if (
@@ -675,7 +709,6 @@ class bbbbSkimmer(SkimmerABC):
                 "PQCD",
                 "PQCDb",
                 "PQCDbb",
-
                 "PQCD0HF",
                 "PQCD1HF",
                 "PQCD2HF",
@@ -702,7 +735,7 @@ class bbbbSkimmer(SkimmerABC):
                 **self.skim_vars["FatJet"],
                 **{var: var for var in extra_vars},
             }
-        if self._nano_version == "v14_25v2": 
+        if self._nano_version == "v14_25v2":
             extra_vars = [
                 # ParT 2
                 "ParT2PQCD1HF",
@@ -736,7 +769,7 @@ class bbbbSkimmer(SkimmerABC):
                 **{var: var for var in extra_vars},
             }
 
-            txbbstr_to_branch["glopart-v2"] = "ParT2TXbb" 
+            txbbstr_to_branch["glopart-v2"] = "ParT2TXbb"
             txbbstr_to_branch["glopart-v3"] = "ParT3TXbb"
             txbbstr_to_skimmer["glopart-v2"] = "ParT2TXbb"
             txbbstr_to_skimmer["glopart-v3"] = "ParT3TXbb"
@@ -744,34 +777,38 @@ class bbbbSkimmer(SkimmerABC):
         if self._nano_version == "v15_scouting":
             # scoutGlobalParT (glopartv3 trained on scouting MC) in v15_scouting (for MC and data)
             # also have GloParT-v3 available for scouting MC offline reconstruction
-            extra_vars = [ 
-            "ParT3PQCD",
-            "ParT3PTopbWev",
-            "ParT3PTopbWmv",
-            "ParT3PTopbWq",
-            "ParT3PTopbWqq",
-            "ParT3PTopbWtauhv",
-            "ParT3PXbb",
-            "ParT3PXcc",
-            "ParT3PXcs",
-            "ParT3PXqq",
-            "ParT3TXbb",
-            "ParT3massGeneric", 
-            "ParT3massCorrectedX2p",
-            "ParT3massCorrFactorX2p",
-            ] if not self.use_scouting else [
-            "ScoutParTPQCD",
-            "ScoutParTPXbb",
-            "ScoutParTPXcc",
-            "ScoutParTPXcs",
-            "ScoutParTPXqq",
-            "ScoutParTTXbb",
-            "ScoutParTmassGeneric",
-            "ScoutParTmassCorrectedX2p",
-            "ScoutParTmassCorrectedW2p",
-            "ScoutParTmassCorrFactorX2p",
-            "ScoutParTmassCorrFactorW2p",
-            ]
+            extra_vars = (
+                [
+                    "ParT3PQCD",
+                    "ParT3PTopbWev",
+                    "ParT3PTopbWmv",
+                    "ParT3PTopbWq",
+                    "ParT3PTopbWqq",
+                    "ParT3PTopbWtauhv",
+                    "ParT3PXbb",
+                    "ParT3PXcc",
+                    "ParT3PXcs",
+                    "ParT3PXqq",
+                    "ParT3TXbb",
+                    "ParT3massGeneric",
+                    "ParT3massCorrectedX2p",
+                    "ParT3massCorrFactorX2p",
+                ]
+                if not self.use_scouting
+                else [
+                    "ScoutParTPQCD",
+                    "ScoutParTPXbb",
+                    "ScoutParTPXcc",
+                    "ScoutParTPXcs",
+                    "ScoutParTPXqq",
+                    "ScoutParTTXbb",
+                    "ScoutParTmassGeneric",
+                    "ScoutParTmassCorrectedX2p",
+                    "ScoutParTmassCorrectedW2p",
+                    "ScoutParTmassCorrFactorX2p",
+                    "ScoutParTmassCorrFactorW2p",
+                ]
+            )
 
             if self.use_scouting:
                 self.skim_vars["ScoutingFatPFJetRecluster"] = {
@@ -784,9 +821,9 @@ class bbbbSkimmer(SkimmerABC):
                     **{var: var for var in extra_vars},
                 }
 
-            txbbstr_to_branch["glopart-v3"] = "ParT3TXbb" 
+            txbbstr_to_branch["glopart-v3"] = "ParT3TXbb"
             txbbstr_to_skimmer["glopart-v3"] = "ParT3TXbb"
-            txbbstr_to_branch["glopart-scouting"] = "ScoutParTTXbb" 
+            txbbstr_to_branch["glopart-scouting"] = "ScoutParTTXbb"
             txbbstr_to_skimmer["glopart-scouting"] = "ScoutParTTXbb"
 
         logger.info(f"Running skimmer with systematics {self._systematics}")
@@ -803,7 +840,13 @@ class bbbbSkimmer(SkimmerABC):
         print("# events", len(events))
 
         year = events.metadata["dataset"].split("_")[0]
-        is_run3 = year in ["2022", "2022EE", "2023", "2023BPix", "2024"] # 2024 needs separate handling? TODO: Not implemented yet.
+        is_run3 = year in [
+            "2022",
+            "2022EE",
+            "2023",
+            "2023BPix",
+            "2024",
+        ]  # 2024 needs separate handling? TODO: Not implemented yet.
         dataset = "_".join(events.metadata["dataset"].split("_")[1:])
         isData = not hasattr(events, "genWeight")
 
@@ -832,7 +875,7 @@ class bbbbSkimmer(SkimmerABC):
         selection_args = (selection, cutflow, isData, gen_weights)
 
         # JEC factory loader
-        JEC_loader = JECs(year = year, use_scouting=self.use_scouting)
+        JEC_loader = JECs(year=year, use_scouting=self.use_scouting)
         print(year)
 
         #########################
@@ -841,24 +884,52 @@ class bbbbSkimmer(SkimmerABC):
         print("starting object selection", f"{time.time() - start:.2f}")
 
         # Leptons TODO: These cuts are problematic for scouting since electrons are not reconstructed ~ Worry about this if we do production mode discrimination
-        if not self.use_scouting: # Temporary fix, Patin will have to take this out of the conditional, I tried adding the conditionals below but there are missing fields like looseId etc.
-            veto_muon_sel = veto_muons(events.Muon) if not self.use_scouting else veto_muons(events.ScoutingMuon)
-            veto_electron_sel = veto_electrons(events.Electron)  if not self.use_scouting else veto_muons(events.ScoutingElectron) 
+        if (
+            not self.use_scouting
+        ):  # Temporary fix, Patin will have to take this out of the conditional, I tried adding the conditionals below but there are missing fields like looseId etc.
+            veto_muon_sel = (
+                veto_muons(events.Muon)
+                if not self.use_scouting
+                else veto_muons(events.ScoutingMuon)
+            )
+            veto_electron_sel = (
+                veto_electrons(events.Electron)
+                if not self.use_scouting
+                else veto_muons(events.ScoutingElectron)
+            )
             if self._region != "signal":
-                good_muon_sel = good_muons(events.Muon) if not self.use_scouting else good_muons(events.ScoutingMuon)
-                muons = events.Muon[good_muon_sel] if not self.use_scouting else events.ScoutingMuon[good_muon_sel]
+                good_muon_sel = (
+                    good_muons(events.Muon)
+                    if not self.use_scouting
+                    else good_muons(events.ScoutingMuon)
+                )
+                muons = (
+                    events.Muon[good_muon_sel]
+                    if not self.use_scouting
+                    else events.ScoutingMuon[good_muon_sel]
+                )
                 muons["id"] = muons.charge * (13)
 
                 # Electrons are not reco'd in scouting so nothing passes the good_electrons() filter
-                good_electron_sel = good_electrons(events.Electron) if not self.use_scouting else good_muons(events.ScoutingElectron)
-                electrons = events.Electron[good_electron_sel] if not self.use_scouting else events.ScoutingElectron[good_electron_sel]
+                good_electron_sel = (
+                    good_electrons(events.Electron)
+                    if not self.use_scouting
+                    else good_muons(events.ScoutingElectron)
+                )
+                electrons = (
+                    events.Electron[good_electron_sel]
+                    if not self.use_scouting
+                    else events.ScoutingElectron[good_electron_sel]
+                )
                 electrons["id"] = electrons.charge * (11)
 
         # AK4 Jets
         num_jets = 4
         jets, jec_shifted_jetvars = JEC_loader.get_jec_jets(
             events,
-            events.Jet if not self.use_scouting else events.ScoutingPFJetRecluster, # If we use scouting we use ScoutingPFJetRecluster
+            (
+                events.Jet if not self.use_scouting else events.ScoutingPFJetRecluster
+            ),  # If we use scouting we use ScoutingPFJetRecluster
             year,
             isData,
             jecs=self.jecs,
@@ -867,9 +938,11 @@ class bbbbSkimmer(SkimmerABC):
             dataset=dataset,
             nano_version=self._nano_version,
             use_scouting=self.use_scouting,
-        )  
+        )
 
-        if JEC_loader.met_factory is not None: # TODO: This whole MET business is a mess to me. Figure it out?
+        if (
+            JEC_loader.met_factory is not None
+        ):  # TODO: This whole MET business is a mess to me. Figure it out?
             # check if "MET" attribute exists
             if not self.use_scouting:
                 if hasattr(events, "MET"):
@@ -879,34 +952,56 @@ class bbbbSkimmer(SkimmerABC):
                     # No deltaX and deltaY in PuppiMET, so we calculate them
                     deltaX_up = events_met.ptUnclusteredUp * np.cos(events_met.phiUnclusteredUp)
                     deltaY_up = events_met.ptUnclusteredUp * np.sin(events_met.phiUnclusteredUp)
-                    deltaX_down = events_met.ptUnclusteredDown * np.cos(events_met.phiUnclusteredDown)
-                    deltaY_down = events_met.ptUnclusteredDown * np.sin(events_met.phiUnclusteredDown)
+                    deltaX_down = events_met.ptUnclusteredDown * np.cos(
+                        events_met.phiUnclusteredDown
+                    )
+                    deltaY_down = events_met.ptUnclusteredDown * np.sin(
+                        events_met.phiUnclusteredDown
+                    )
                     events_met["MetUnclustEnUpDeltaX"] = np.abs(deltaX_up - deltaX_down) / 2
                     events_met["MetUnclustEnUpDeltaY"] = np.abs(deltaY_up - deltaY_down) / 2
                 else:
                     raise AttributeError("Neither 'MET' nor 'PuppiMET' attribute found in events.")
             if self.use_scouting:
                 if hasattr(events, "ScoutingMET"):
-                    events_met = events.ScoutingMET 
-                elif hasattr(events, "PuppiMET"): # Scouting doesn't have PuppiMET? Discuss this part with Patin
-                    events_met = events.PuppiMET # TODO: What is this and does this work for scouting?
+                    events_met = events.ScoutingMET
+                elif hasattr(
+                    events, "PuppiMET"
+                ):  # Scouting doesn't have PuppiMET? Discuss this part with Patin
+                    events_met = (
+                        events.PuppiMET
+                    )  # TODO: What is this and does this work for scouting?
                     deltaX_up = events_met.ptUnclusteredUp * np.cos(events_met.phiUnclusteredUp)
                     deltaY_up = events_met.ptUnclusteredUp * np.sin(events_met.phiUnclusteredUp)
-                    deltaX_down = events_met.ptUnclusteredDown * np.cos(events_met.phiUnclusteredDown)
-                    deltaY_down = events_met.ptUnclusteredDown * np.sin(events_met.phiUnclusteredDown)
+                    deltaX_down = events_met.ptUnclusteredDown * np.cos(
+                        events_met.phiUnclusteredDown
+                    )
+                    deltaY_down = events_met.ptUnclusteredDown * np.sin(
+                        events_met.phiUnclusteredDown
+                    )
                     events_met["MetUnclustEnUpDeltaX"] = np.abs(deltaX_up - deltaX_down) / 2
                     events_met["MetUnclustEnUpDeltaY"] = np.abs(deltaY_up - deltaY_down) / 2
                 else:
-                    raise AttributeError("Neither 'ScoutingMET' nor 'PuppiMET' attribute found in events.")
+                    raise AttributeError(
+                        "Neither 'ScoutingMET' nor 'PuppiMET' attribute found in events."
+                    )
 
-            met = JEC_loader.met_factory.build(events_met, jets, {}) if isData and not self.use_scouting else events_met # TODO: Can we abandon JECs for scouting? A: Yes pretty much. A2: Probably not? Currently notice significant mass bias and suspect that this is due to lack of JECs
+            met = (
+                JEC_loader.met_factory.build(events_met, jets, {})
+                if isData and not self.use_scouting
+                else events_met
+            )  # TODO: Can we abandon JECs for scouting? A: Yes pretty much. A2: Probably not? Currently notice significant mass bias and suspect that this is due to lack of JECs
         else:
             if hasattr(events, "MET"):
                 met = events.MET if not self.use_scouting else events.ScoutingMET
             elif hasattr(events, "PuppiMET"):
-                met = events.PuppiMET # TODO: Why don't we calculate deltaX and deltaY if no JEC factory?; what is JEC factory?
+                met = (
+                    events.PuppiMET
+                )  # TODO: Why don't we calculate deltaX and deltaY if no JEC factory?; what is JEC factory?
             else:
-                raise AttributeError(f"Neither {'MET' if not self.use_scouting else 'ScoutingMET'} nor 'PuppiMET' attribute found in events.")
+                raise AttributeError(
+                    f"Neither {'MET' if not self.use_scouting else 'ScoutingMET'} nor 'PuppiMET' attribute found in events."
+                )
 
         print("ak4 JECs", f"{time.time() - start:.2f}")
 
@@ -916,7 +1011,7 @@ class bbbbSkimmer(SkimmerABC):
         if self._region == "semiboosted":
             jets_sel = (jets.pt > 30) & (abs(jets.eta) < 2.5)
         elif self._region == "zbb":
-            jets_sel = (jets.pt > 15) & (abs(jets.eta) < 2.4) 
+            jets_sel = (jets.pt > 15) & (abs(jets.eta) < 2.4)
         else:
             jets_sel = (jets.pt > 15) & (abs(jets.eta) < 4.7)
 
@@ -930,7 +1025,9 @@ class bbbbSkimmer(SkimmerABC):
         if not self.use_scouting:
             fatjets = get_ak8jets(events.FatJet)  # this adds all our extra variables e.g. TXbb
         else:
-            fatjets = get_ak8jets(events.ScoutingFatPFJetRecluster)  # this adds all our extra variables e.g. TXbb
+            fatjets = get_ak8jets(
+                events.ScoutingFatPFJetRecluster
+            )  # this adds all our extra variables e.g. TXbb
 
         fatjets, jec_shifted_fatjetvars = JEC_loader.get_jec_jets(
             events,
@@ -947,17 +1044,33 @@ class bbbbSkimmer(SkimmerABC):
         print("ak8 JECs", f"{time.time() - start:.2f}")
 
         if self._region in ("zbb", "zbb-DYLL-data", "zbb-Zto2Q-DYLL"):
-            fatjets = good_ak8jets(
-                fatjets, **self.zbb_fatjet_selection, nano_version=self._nano_version, use_scouting=self.use_scouting
-            ) if not self.use_scouting else good_ak8jets(
-                fatjets, **self.zbb_fatjet_scouting_selection, nano_version=self._nano_version, use_scouting=self.use_scouting
-            ) # Different zbb fatjet selection in scouting
+            fatjets = (
+                good_ak8jets(
+                    fatjets,
+                    **self.zbb_fatjet_selection,
+                    nano_version=self._nano_version,
+                    use_scouting=self.use_scouting,
+                )
+                if not self.use_scouting
+                else good_ak8jets(
+                    fatjets,
+                    **self.zbb_fatjet_scouting_selection,
+                    nano_version=self._nano_version,
+                    use_scouting=self.use_scouting,
+                )
+            )  # Different zbb fatjet selection in scouting
         else:
             fatjets = good_ak8jets(
-                fatjets, **self.fatjet_selection, nano_version=self._nano_version, use_scouting=self.use_scouting
+                fatjets,
+                **self.fatjet_selection,
+                nano_version=self._nano_version,
+                use_scouting=self.use_scouting,
             )
 
-        if self._region in ("zbb-DYLL-data", "zbb-Zto2Q-DYLL"): # TODO: These corrections in scouting? Can be derived from non-scouting data, just xsec corrections? A: Yes -Patin
+        if self._region in (
+            "zbb-DYLL-data",
+            "zbb-Zto2Q-DYLL",
+        ):  # TODO: These corrections in scouting? Can be derived from non-scouting data, just xsec corrections? A: Yes -Patin
             # no need for fatjets
             fatjets_xbb = fatjets
         else:
@@ -968,7 +1081,6 @@ class bbbbSkimmer(SkimmerABC):
 
             # fatjets ordered by txbb
             fatjets_xbb = fatjets[ak.argsort(fatjets[txbb_order], ascending=False)]
-
 
         # variations for bb fatjets
         jec_shifted_bbfatjetvars = {}
@@ -990,7 +1102,7 @@ class bbbbSkimmer(SkimmerABC):
                 events,
                 **self.vbf_jet_selection,
                 **self.vbf_veto_lepton_selection,
-            )   
+            )
 
         # AK4 objects away from first two fatjets
         if self._region == "semiboosted":
@@ -1005,7 +1117,7 @@ class bbbbSkimmer(SkimmerABC):
         elif self._region == "zbb":
             # any Ak4 jets with
             # - pT > 30 GeV
-            # - |eta| < 2.4 
+            # - |eta| < 2.4
             # - dR(ak4, fatjet0_xbb) > 0.8
             # will eventually need all these jets to be below btag medium threshold
             ak4_jets_awayfromak8 = objects.ak4_jets_awayfromak8(
@@ -1015,7 +1127,7 @@ class bbbbSkimmer(SkimmerABC):
                 **self.zbb_top_veto_ak4_selection,
                 **self.zbb_top_veto_lepton_selection,
                 sort_by="none",
-                use_scouting=self.use_scouting
+                use_scouting=self.use_scouting,
             )
         else:
             ak4_jets_awayfromak8 = objects.ak4_jets_awayfromak8(
@@ -1067,14 +1179,14 @@ class bbbbSkimmer(SkimmerABC):
 
         # AK4 Jet variables
         if not self.use_scouting:
-            jet_skimvars = self.skim_vars["Jet"] # standard variables
+            jet_skimvars = self.skim_vars["Jet"]  # standard variables
         else:
-            jet_skimvars = self.skim_vars["ScoutingPFJetRecluster"] # scouting ak4 jet variables
+            jet_skimvars = self.skim_vars["ScoutingPFJetRecluster"]  # scouting ak4 jet variables
 
         if not isData:
             jet_skimvars = {
                 **jet_skimvars,
-                "pt_gen": "MatchedGenJetPt", 
+                "pt_gen": "MatchedGenJetPt",
             }
 
         ak4JetVars = {
@@ -1100,19 +1212,19 @@ class bbbbSkimmer(SkimmerABC):
             }
 
         # AK8 Jet variables
-        if not self.use_scouting: 
-            fatjet_skimvars = self.skim_vars["FatJet"] 
-        else: 
+        if not self.use_scouting:
+            fatjet_skimvars = self.skim_vars["FatJet"]
+        else:
             fatjet_skimvars = self.skim_vars["ScoutingFatPFJetRecluster"]
 
-        if not isData: 
-            fatjet_skimvars = {**fatjet_skimvars, "pt_gen": "MatchedGenJetPt"} 
+        if not isData:
+            fatjet_skimvars = {**fatjet_skimvars, "pt_gen": "MatchedGenJetPt"}
 
         ak8FatJetVars = {
             f"ak8FatJet{key}": pad_val(fatjets[var], 3, axis=1)
             for (var, key) in fatjet_skimvars.items()
         }
-        bbFatJetVars = { 
+        bbFatJetVars = {
             f"bbFatJet{key}": pad_val(fatjets_xbb[var], 2, axis=1)
             for (var, key) in fatjet_skimvars.items()
         }
@@ -1147,13 +1259,17 @@ class bbbbSkimmer(SkimmerABC):
             # JECs and JMSR for Zbb
             # FatJet JEC variables
             for var in ["pt"]:
-                key = self.skim_vars["FatJet"][var] if not self.use_scouting else self.skim_vars["ScoutingFatPFJetRecluster"][var]
+                key = (
+                    self.skim_vars["FatJet"][var]
+                    if not self.use_scouting
+                    else self.skim_vars["ScoutingFatPFJetRecluster"][var]
+                )
                 for shift, vals in jec_shifted_bbfatjetvars[var].items():
                     if shift != "":
                         bbFatJetVars[f"bbFatJet{key}_{shift}"] = pad_val(vals, 2, axis=1)
 
             # FatJet JMSR
-            for var in self.jmsr_vars: 
+            for var in self.jmsr_vars:
                 key = fatjet_skimvars[var]
                 bbFatJetVars[f"bbFatJet{key}_raw"] = bbFatJetVars[f"bbFatJet{key}"]
                 for shift, vals in bb_jmsr_shifted_vars[var].items():
@@ -1170,7 +1286,7 @@ class bbbbSkimmer(SkimmerABC):
         }
         eventVars["MET_pt"] = met_pt.to_numpy()
         eventVars["ht"] = ht.to_numpy()
-        eventVars["nJets"] = ak.sum(jets_sel, axis=1).to_numpy() 
+        eventVars["nJets"] = ak.sum(jets_sel, axis=1).to_numpy()
         eventVars["nFatJets"] = ak.num(fatjets).to_numpy()
 
         if isData:
@@ -1178,8 +1294,12 @@ class bbbbSkimmer(SkimmerABC):
         else:
             pileupVars = {key: events.Pileup[key].to_numpy() for key in self.skim_vars["Pileup"]}
 
-        pileupVars = {**pileupVars, "nPV": events.PV["npvs"].to_numpy()} if not self.use_scouting else {**pileupVars, "nPV": ak.num(events.ScoutingPrimaryVertex, axis = 1).to_numpy()} # TODO: Check if axis = 1 is the correct one to use
-        
+        pileupVars = (
+            {**pileupVars, "nPV": events.PV["npvs"].to_numpy()}
+            if not self.use_scouting
+            else {**pileupVars, "nPV": ak.num(events.ScoutingPrimaryVertex, axis=1).to_numpy()}
+        )  # TODO: Check if axis = 1 is the correct one to use
+
         # Trigger variables
         HLTs = deepcopy(self.HLTs[year])
         # We should not use != "signal" as a condition, it is hard to understand which skimmer needs this. - Raghav
@@ -1220,8 +1340,8 @@ class bbbbSkimmer(SkimmerABC):
             }
             print("HLT vars", f"{time.time() - start:.2f}")
 
-        else: # for scouting we use DST, not HLT triggers
-            DSTVars = { 
+        else:  # for scouting we use DST, not HLT triggers
+            DSTVars = {
                 trigger: (
                     events.DST[trigger].to_numpy().astype(int)
                     if trigger in events.DST.fields
@@ -1230,7 +1350,7 @@ class bbbbSkimmer(SkimmerABC):
                 for trigger in self.DSTs
             }
 
-            L1vars = { 
+            L1vars = {
                 trigger: (
                     events.L1[trigger].to_numpy().astype(int)
                     if trigger in events.L1.fields
@@ -1255,10 +1375,9 @@ class bbbbSkimmer(SkimmerABC):
 
             print("DST vars", f"{time.time() - start:.2f}")
 
-
         # add trigger objects (for fatjets, id==6)
         # fields: 'pt', 'eta', 'phi', 'l1pt', 'l1pt_2', 'l2pt', 'id', 'l1iso', 'l1charge', 'filterBits'
-        if not self.use_scouting: 
+        if not self.use_scouting:
             # Scouting can't do offline to HLT object matching because we don't have offline objects. The equivalent process
             # would be to do matching of HLT objects to L1 objects, but these objects are so different that matching doesn't make sense
             num_trigobjs = 4
@@ -1291,11 +1410,11 @@ class bbbbSkimmer(SkimmerABC):
             print("TrigObj vars", f"{time.time() - start:.2f}")
 
         # vbfJets
-        if not self.use_scouting: # TODO: Ok to remove for scouting?
+        if not self.use_scouting:  # TODO: Ok to remove for scouting?
             vbfJetVars = {
                 f"VBFJet{key}": pad_val(vbf_jets[var], 2, axis=1)
                 for (var, key) in self.skim_vars["Jet"].items()
-            }   
+            }
 
         # JEC variations for VBF Jets
         if self._region == "signal" and isJECs:
@@ -1310,31 +1429,31 @@ class bbbbSkimmer(SkimmerABC):
 
         if not self.use_scouting:
             skimmed_events = {
-            **genVars,
-            **eventVars,
-            **pileupVars,
-            **HLTVars,
-            **ak4JetAwayVars,
-            **ak8FatJetVars,
-            **bbFatJetVars,
-            **trigObjFatJetVars,
-            **vbfJetVars,
-        }
+                **genVars,
+                **eventVars,
+                **pileupVars,
+                **HLTVars,
+                **ak4JetAwayVars,
+                **ak8FatJetVars,
+                **bbFatJetVars,
+                **trigObjFatJetVars,
+                **vbfJetVars,
+            }
         else:
             skimmed_events = {
-            **genVars,
-            **eventVars,
-            **pileupVars,
-            **DSTVars, # DST instead of HLT for scouting
-            **L1vars,
-            **ak4JetAwayVars,
-            **ak8FatJetVars,
-            **bbFatJetVars,
-            # **trigObjFatJetVars, 
-            # Commenting out VBF jets for now, since I do not need them for the scouting analysis- Eetu 11/07/25
-            # **vbfJetVars,
-        }
-        
+                **genVars,
+                **eventVars,
+                **pileupVars,
+                **DSTVars,  # DST instead of HLT for scouting
+                **L1vars,
+                **ak4JetAwayVars,
+                **ak8FatJetVars,
+                **bbFatJetVars,
+                # **trigObjFatJetVars,
+                # Commenting out VBF jets for now, since I do not need them for the scouting analysis- Eetu 11/07/25
+                # **vbfJetVars,
+            }
+
         if self._region == "zbb-Zto2Q-DYLL":
             # only need gen-level information for this region
             skimmed_events = genVars
@@ -1398,16 +1517,20 @@ class bbbbSkimmer(SkimmerABC):
         if apply_trigger and not self.use_scouting:
             HLT_triggered = np.any(
                 np.array(
-                    [events.HLT[trigger] for trigger in self.HLTs[year] if trigger in events.HLT.fields] 
+                    [
+                        events.HLT[trigger]
+                        for trigger in self.HLTs[year]
+                        if trigger in events.HLT.fields
+                    ]
                 ),
                 axis=0,
             )
             add_selection("trigger", HLT_triggered, *selection_args)
-            
+
         if self.use_scouting and apply_trigger:
             # Pre 2023C-v2 DST_Run3_PFScoutingPixelTracking contained muon seeds. Afterwards it was simply jet + HT L1 seeds.
-            # We want to use the jet + HT seeds throughout, so for 2023C-v2 and earlier we apply an OR of the L1 seeds. For 
-            # later years we simply use the catch-all DST_Run3_PFScoutingPixelTracking trigger path. 
+            # We want to use the jet + HT seeds throughout, so for 2023C-v2 and earlier we apply an OR of the L1 seeds. For
+            # later years we simply use the catch-all DST_Run3_PFScoutingPixelTracking trigger path.
 
             # Note if you are using 2022 MC, it may contain muon seeds in the DST paths (check). The 2023C MC uses the later trigger menu,
             # where DST is simply jet + HT throughout the whole sample. This is a warning, I have no clue if this is the actual case in 2022 MC.
@@ -1416,8 +1539,10 @@ class bbbbSkimmer(SkimmerABC):
 
             # Reference: https://codimd.web.cern.ch/D8_9OfwlSF66qkbBy6sjkg
             if isData:
-                mask = events.run < 367621 # Implemented as a mask because some files have more than 1 run number and truth value of an array is ambigious
-            
+                mask = (
+                    events.run < 367621
+                )  # Implemented as a mask because some files have more than 1 run number and truth value of an array is ambigious
+
                 L1_Jet_HT_seeds = [
                     "HTT200er",
                     "HTT255er",
@@ -1434,21 +1559,39 @@ class bbbbSkimmer(SkimmerABC):
                     "DoubleJet30er2p5_Mass_Min360_dEta_Max1p5",
                 ]
 
-                DST_list_pre367621 = [events.L1[seed] for seed in L1_Jet_HT_seeds if seed in events.L1.fields]
-                DST_list_post367621 = [events.DST[trigger] for trigger in self.DSTs[year] if trigger in events.DST.fields]
+                DST_list_pre367621 = [
+                    events.L1[seed] for seed in L1_Jet_HT_seeds if seed in events.L1.fields
+                ]
+                DST_list_post367621 = [
+                    events.DST[trigger]
+                    for trigger in self.DSTs[year]
+                    if trigger in events.DST.fields
+                ]
 
                 # Logical OR
-                DST_triggered_pre367621 = np.any(np.column_stack(DST_list_pre367621), axis=1) if DST_list_pre367621 else np.zeros(len(events), dtype=bool)
-                DST_triggered_post367621 = np.any(np.column_stack(DST_list_post367621), axis=1) if DST_list_post367621 else np.zeros(len(events), dtype=bool)
+                DST_triggered_pre367621 = (
+                    np.any(np.column_stack(DST_list_pre367621), axis=1)
+                    if DST_list_pre367621
+                    else np.zeros(len(events), dtype=bool)
+                )
+                DST_triggered_post367621 = (
+                    np.any(np.column_stack(DST_list_post367621), axis=1)
+                    if DST_list_post367621
+                    else np.zeros(len(events), dtype=bool)
+                )
 
                 # Combine pre and post 367621 results based on the mask
                 DST_triggered = ak.where(mask, DST_triggered_pre367621, DST_triggered_post367621)
-            
+
             else:
-                DST_list  = [events.DST[trigger] for trigger in self.DSTs[year] if trigger in events.DST.fields] 
-            
+                DST_list = [
+                    events.DST[trigger]
+                    for trigger in self.DSTs[year]
+                    if trigger in events.DST.fields
+                ]
+
                 # Logical OR
-                if DST_list :
+                if DST_list:
                     DST_triggered = np.any(
                         np.array(DST_list),
                         axis=0,
@@ -1459,14 +1602,14 @@ class bbbbSkimmer(SkimmerABC):
             add_selection("dst", DST_triggered, *selection_args)
 
         # metfilters
-        if not self.use_scouting: 
+        if not self.use_scouting:
             cut_metfilters = np.ones(len(events), dtype="bool")
             for mf in self.met_filters:
                 if mf in events.Flag.fields:
                     cut_metfilters = cut_metfilters & events.Flag[mf]
             apply_met_filters = True
         else:
-            apply_met_filters = False # Drop MET filters for scouting, can't do them (earlier). - Really, (Now)? - Eetu 13/08
+            apply_met_filters = False  # Drop MET filters for scouting, can't do them (earlier). - Really, (Now)? - Eetu 13/08
 
         if self._region == "zbb-Zto2Q-DYLL":
             # in Zbb-Zto2Q-DYLL region we do not apply any met filters
@@ -1496,7 +1639,7 @@ class bbbbSkimmer(SkimmerABC):
                 "0lep",
                 (ak.sum(veto_muon_sel, axis=1) == 0) & (ak.sum(veto_electron_sel, axis=1) == 0),
                 *selection_args,
-            ) # this is for pre-sel and signal so not a concern for zbb scouting
+            )  # this is for pre-sel and signal so not a concern for zbb scouting
 
             if self._region == "signal":
                 # >=1 bb AK8 jets (ordered by TXbb) with TXbb > 0.8
@@ -1585,7 +1728,7 @@ class bbbbSkimmer(SkimmerABC):
                 cut_pt_lead = (
                     np.sum(
                         (bbFatJetVars["bbFatJetPt"][:, :2] >= 300)
-                        & (bbFatJetVars["bbFatJetMsd"][:, :2] >= 20), 
+                        & (bbFatJetVars["bbFatJetMsd"][:, :2] >= 20),
                         axis=1,
                     )
                 ) >= 1
@@ -1616,18 +1759,24 @@ class bbbbSkimmer(SkimmerABC):
                     cut_txbb = (
                         (np.sum(bbFatJetVars["bbFatJetParT2TXbb"][:, :2] >= 0.1, axis=1) >= 1)
                         | (np.sum(bbFatJetVars["bbFatJetParT3TXbb"][:, :2] >= 0.1, axis=1) >= 1)
-                        | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1)
+                        | (
+                            np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1)
+                            >= 1
+                        )
                     )
-                elif self._nano_version.startswith("v15"): # This does not work in scouting since ParT3TXbb is not present there, rather ScoutGloParTTXbb
+                elif self._nano_version.startswith(
+                    "v15"
+                ):  # This does not work in scouting since ParT3TXbb is not present there, rather ScoutGloParTTXbb
                     # ParT3 in v15
                     cut_txbb = (
-                        (np.sum(bbFatJetVars["bbFatJetParT3TXbb"][:, :2] >= 0.1, axis=1) >= 1)
+                        np.sum(bbFatJetVars["bbFatJetParT3TXbb"][:, :2] >= 0.1, axis=1)
+                        >= 1
                         # | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1) # TODO: Ask Patin if this is needed
                     )
                 else:
-                    cut_txbb = (np.sum(bbFatJetVars["bbFatJetParTTXbb"][:, :2] >= 0.1, axis=1) >= 1) | (
-                        np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1
-                    )
+                    cut_txbb = (
+                        np.sum(bbFatJetVars["bbFatJetParTTXbb"][:, :2] >= 0.1, axis=1) >= 1
+                    ) | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1)
                 add_selection("ak8bb_txbb", cut_txbb, *selection_args)
 
                 # HT > 1000
@@ -1641,12 +1790,13 @@ class bbbbSkimmer(SkimmerABC):
                     *selection_args,
                 )
 
-               # top veto: no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
+                # top veto: no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
                 medium_btag_th_dict = {
                     "2022": 0.3086,
                     "2022EE": 0.3196,
                     "2023": 0.2431,
                     "2023BPix": 0.2435,
+                    "2024": 0.2435,  # need to double check this
                 }
                 # no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
                 cut_top_veto = (
@@ -1658,20 +1808,21 @@ class bbbbSkimmer(SkimmerABC):
                 )
                 add_selection("top_veto", cut_top_veto, *selection_args)
 
-            else: # use scouting variables
+            else:  # use scouting variables
                 # >=2 AK8 jets
                 add_selection("num_ak8jets", eventVars["nFatJets"] >= 2, *selection_args)
                 # FatJet0 with pT>250, mSD>40
-                cut_pt_lead = (
-                    (bbFatJetVars["bbFatJetPt"][:, 0] >= 300)
-                    & (bbFatJetVars["bbFatJetMsd"][:, 0] >= 0) # Trying 20
-                )
-                add_selection("ak8_ptmSD_lead", cut_pt_lead, *selection_args) # Includes a cut on leading pt as well
+                cut_pt_lead = (bbFatJetVars["bbFatJetPt"][:, 0] >= 300) & (
+                    bbFatJetVars["bbFatJetMsd"][:, 0] >= 0
+                )  # Trying 20
+                add_selection(
+                    "ak8_ptmSD_lead", cut_pt_lead, *selection_args
+                )  # Includes a cut on leading pt as well
 
                 # FatJet1 with pT>200
                 cut_pt_subl = (
                     np.sum(
-                        bbFatJetVars["bbFatJetPt"][:, :2] >= 200, # 170?
+                        bbFatJetVars["bbFatJetPt"][:, :2] >= 200,  # 170?
                         axis=1,
                     )
                 ) >= 2  # >=2 because we already have the lead fatjet
@@ -1689,22 +1840,23 @@ class bbbbSkimmer(SkimmerABC):
 
                 # >= 1 AK8 jet with ParT/PNet Xbb >= 0.1
                 cut_txbb = (
-                    (np.sum(bbFatJetVars["bbFatJetScoutParTTXbb"][:, :2] >= 0.1, axis=1) >= 1)
+                    np.sum(bbFatJetVars["bbFatJetScoutParTTXbb"][:, :2] >= 0.1, axis=1)
+                    >= 1
                     # | (np.sum(bbFatJetVars["bbFatJetPNetTXbbLegacy"][:, :2] >= 0.1, axis=1) >= 1) # I don't think this is needed in scouting
                 )
-               
+
                 add_selection("ak8bb_txbb", cut_txbb, *selection_args)
 
                 # HT > 500
                 add_selection("ht500", eventVars["ht"] >= 600, *selection_args)
 
                 # top veto: no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
-                medium_btag_th_dict = { # Commented out values are for deepFlavB
+                medium_btag_th_dict = {  # Commented out values are for deepFlavB
                     # "2022": 0.3086,
                     # "2022EE": 0.3196,
-                    "2023": 0.1918, # Same as below
-                    "2023BPix": 0.1923, # PNet medium WP using jetveto map, from https://btv-wiki.docs.cern.ch/PerformanceCalibration/ BTagPerf_240115_Summer23WPs_VetoMap.pdf
-                    "2024": 0.1923, # TODO: Do working points exist? Will continue using 2023BPix one
+                    "2023": 0.1918,  # Same as below
+                    "2023BPix": 0.1923,  # PNet medium WP using jetveto map, from https://btv-wiki.docs.cern.ch/PerformanceCalibration/ BTagPerf_240115_Summer23WPs_VetoMap.pdf
+                    "2024": 0.1923,  # TODO: Do working points exist? Will continue using 2023BPix one
                 }
                 # no medium b-tagged AK4 jets with pT>30, |eta|<2.4, and dR(ak4, bbFatJet0) > 0.8
                 cut_top_veto = (
@@ -1842,8 +1994,8 @@ class bbbbSkimmer(SkimmerABC):
         weights = Weights(len(events), storeIndividual=True)
         weights.add("genweight", gen_weights)
 
-        add_pileup_weight(weights, year, events.Pileup.nPU.to_numpy(), dataset) 
-        add_ps_weight(weights, events.PSWeight) 
+        add_pileup_weight(weights, year, events.Pileup.nPU.to_numpy(), dataset)
+        add_ps_weight(weights, events.PSWeight)
 
         logger.debug("weights", extra=weights._weights.keys())
 
@@ -1971,7 +2123,9 @@ class bbbbSkimmer(SkimmerABC):
         h1ak4away1 = h1 + ak4away1
         h2ak4away2 = h2 + ak4away2
 
-        if self._nano_version.startswith(("v14", "v15")): # TODO: Check if v15 can just be added here like this, v15 only has ParT3
+        if self._nano_version.startswith(
+            ("v14", "v15")
+        ):  # TODO: Check if v15 can just be added here like this, v15 only has ParT3
             # v14 has ParT2 and ParT3
             H1Xbb = disc_TXbb(bbFatJetVars[key_map("bbFatJetParT3TXbb")][:, 0])
             H1Mass = bbFatJetVars[key_map("ParT3massCorrX2p")][:, 0]

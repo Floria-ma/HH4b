@@ -46,7 +46,12 @@ elif args.location == "cern":
     eosdir = f"/eos/user/{args.user[0]}/{args.user}/bbbb/{args.processor}/{args.tag}/{args.year}/"
 
 samples = [str(dir_path.name) for dir_path in Path(eosdir).iterdir()]
-jdls = [str(jdl.name) for sample in samples for jdl in Path(f"condor/{args.processor}/{args.tag}/{sample}").iterdir() if str(jdl).endswith(".jdl")]
+jdls = [
+    str(jdl.name)
+    for sample in samples
+    for jdl in Path(f"condor/{args.processor}/{args.tag}/{sample}").iterdir()
+    if str(jdl).endswith(".jdl")
+]
 
 
 jdl_dict = {}
@@ -122,7 +127,8 @@ for sample in samples:
         continue
 
     outs_pickles = [
-        int(str(out).split(".")[0].split("_")[-1]) for out in Path(f"{eosdir}/{sample}/pickles").iterdir()
+        int(str(out).split(".")[0].split("_")[-1])
+        for out in Path(f"{eosdir}/{sample}/pickles").iterdir()
     ]
 
     if args.processor == "trigger":

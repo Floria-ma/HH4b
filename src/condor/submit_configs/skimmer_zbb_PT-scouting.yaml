@@ -19,14 +19,14 @@
                 "Wto2Q-2Jets_PTQQ-400to600_1J",
                 "Wto2Q-2Jets_PTQQ-400to600_2J",
                 "Wto2Q-2Jets_PTQQ-600_1J",
-                "Wto2Q-2Jets_PTQQ-600_2J", 
+                "Wto2Q-2Jets_PTQQ-600_2J",
             ],
             "files_per_job": 10,
-            "chunksize": 8000 
+            "chunksize": 8000
         },
         "QCD": {
             "subsamples": [
-                "QCD_PT-170to300", 
+                "QCD_PT-170to300",
                 "QCD_PT-300to470",
                 "QCD_PT-470to600",
                 "QCD_PT-600to800",
@@ -70,11 +70,11 @@
                 "Wto2Q-2Jets_PTQQ-600_2J",
             ],
             "files_per_job": 10,
-            "chunksize": 8000 
+            "chunksize": 8000
         },
         "QCD": {
             "subsamples": [
-                "QCD_PT-170to300", 
+                "QCD_PT-170to300",
                 "QCD_PT-300to470",
                 "QCD_PT-470to600",
                 "QCD_PT-600to800",

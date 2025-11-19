@@ -43,7 +43,7 @@ def jetid_v14(jets: ak.Array, use_scouting: bool = False) -> tuple[ak.Array, ak.
     # https://gitlab.cern.ch/cms-jetmet/coordination/coordination/-/issues/117#note_8880788
     """
 
-    if not use_scouting: # Standard recommendations 
+    if not use_scouting:  # Standard recommendations
         jetidtight = (
             (
                 (np.abs(jets.eta) <= 2.6)
@@ -66,7 +66,7 @@ def jetid_v14(jets: ak.Array, use_scouting: bool = False) -> tuple[ak.Array, ak.
             (np.abs(jets.eta) <= 2.7) & jetidtight & (jets.muEF < 0.8) & (jets.chEmEF < 0.8)
         ) | ((np.abs(jets.eta) > 2.7) & jetidtight)
 
-    else: 
+    else:
         # Mildly modified recommendations for scouting https://indico.cern.ch/event/1487156/contributions/6391070/attachments/3024404/5342673/Scouting_JetID_DQM_06_03_2025.pdf,
         # largely because electrons are not reconstructed in scouting; but also Neutral EM fraction cuts are changed from 0.99 to 0.9
         print(jets.fields)
@@ -75,20 +75,21 @@ def jetid_v14(jets: ak.Array, use_scouting: bool = False) -> tuple[ak.Array, ak.
                 (np.abs(jets.eta) <= 2.6)
                 & (jets.neHEF < 0.99)
                 & (jets.neEmEF < 0.9)
-                & ((jets.nConstituents) > 1) # chMultiplicity + neMultiplicity = nConstituents in scouting since no Puppi weighting - cite Patin, TODO: What if we use Scouting with Puppi?
+                & (
+                    (jets.nConstituents) > 1
+                )  # chMultiplicity + neMultiplicity = nConstituents in scouting since no Puppi weighting - cite Patin, TODO: What if we use Scouting with Puppi?
                 & (jets.chHEF > 0.01)
-                & (jets.nCh + jets.nMuons + jets.nElectrons > 0) # chMultiplicity not in some of these nano files, so we compute it
+                & (
+                    jets.nCh + jets.nMuons + jets.nElectrons > 0
+                )  # chMultiplicity not in some of these nano files, so we compute it
             )
-            | (
-                ((np.abs(jets.eta) > 2.6) & (np.abs(jets.eta) <= 2.7))
-                & (jets.neEmEF < 0.9)
-            )
+            | (((np.abs(jets.eta) > 2.6) & (np.abs(jets.eta) <= 2.7)) & (jets.neEmEF < 0.9))
             | (((np.abs(jets.eta) > 2.7) & (np.abs(jets.eta) <= 3.0)) & (jets.neEmEF < 0.9))
         )
 
-        jetidtightlepveto = (
-            (np.abs(jets.eta) <= 2.7) & jetidtight & (jets.muEF < 0.8) 
-        ) | ((np.abs(jets.eta) > 2.7) & jetidtight)
+        jetidtightlepveto = ((np.abs(jets.eta) <= 2.7) & jetidtight & (jets.muEF < 0.8)) | (
+            (np.abs(jets.eta) > 2.7) & jetidtight
+        )
 
     return jetidtight, jetidtightlepveto
 
@@ -204,7 +205,7 @@ def good_ak4jets(jets: JetArray, year: str, nano_version: str, use_scouting: boo
 
     # JETID: https://twiki.cern.ch/twiki/bin/viewauth/CMS/JetID13p6TeV
     # 2 working points: tight and tightLepVeto
-    sel = (jets.pt > 15) & (abs(jets.eta) < 4.7) 
+    sel = (jets.pt > 15) & (abs(jets.eta) < 4.7)
 
     if year == "2018":
         pu_id = sel & ((jets.pt >= 50) | (jets.puId >= 6))
@@ -212,7 +213,7 @@ def good_ak4jets(jets: JetArray, year: str, nano_version: str, use_scouting: boo
     else:
         if nano_version.startswith("v12") or "25v2" in nano_version:
             jetidtight, jetidtightlepveto = jetid_v12(jets)  # v12 jetid fix
-        elif nano_version.startswith(("v15", "v14", "v13")):   
+        elif nano_version.startswith(("v15", "v14", "v13")):
             jetidtight, jetidtightlepveto = jetid_v14(jets, use_scouting=use_scouting)
         else:
             jetidtight, jetidtightlepveto = jets.isTight, jets.isTightLepVeto
@@ -236,13 +237,19 @@ def bregcorr(jets: JetArray):
     )
 
 
-def get_ak8jets(fatjets: FatJetArray): # TODO: This is the goldmine for the variables which are read in
+def get_ak8jets(
+    fatjets: FatJetArray,
+):  # TODO: This is the goldmine for the variables which are read in
     """
     Add extra variables to FatJet collection (mostly renaming)
     """
     fatjets["t32"] = ak.nan_to_num(fatjets.tau3 / fatjets.tau2, nan=-1.0)
     fatjets["t21"] = ak.nan_to_num(fatjets.tau2 / fatjets.tau1, nan=-1.0)
-    fatjets["pt_raw"] = (1 - fatjets.rawFactor) * fatjets.pt if "scoutGlobalParT_prob_Xbb" not in fatjets.fields else fatjets.pt 
+    fatjets["pt_raw"] = (
+        (1 - fatjets.rawFactor) * fatjets.pt
+        if "scoutGlobalParT_prob_Xbb" not in fatjets.fields
+        else fatjets.pt
+    )
 
     fatjets_fields = fatjets.fields
 
@@ -277,9 +284,9 @@ def get_ak8jets(fatjets: FatJetArray): # TODO: This is the goldmine for the vari
             fatjets.ParticleNetMD_probXbb + fatjets["Tqcd"]
         )
         fatjets["Txjj"] = fatjets["Pxjj"] / (fatjets["Pxjj"] + fatjets["Tqcd"])
-    # used to be an else: ..., but scouting is missing these variables, and it would be problematic if particleNet_XbbVsQCD etc. 
+    # used to be an else: ..., but scouting is missing these variables, and it would be problematic if particleNet_XbbVsQCD etc.
     # were not present in other scenarios, so changed to an elif
-    elif "particleNet_XbbVsQCD" in fatjets.fields: 
+    elif "particleNet_XbbVsQCD" in fatjets.fields:
         fatjets["Txbb"] = fatjets.particleNet_XbbVsQCD
         fatjets["Txjj"] = fatjets.particleNet_XqqVsQCD
         fatjets["Tqcd"] = fatjets.particleNet_QCD
@@ -313,14 +320,16 @@ def get_ak8jets(fatjets: FatJetArray): # TODO: This is the goldmine for the vari
         #     fatjets["PQCD2HF_legacy"] = fatjets.particleNetLegacy_QCDbb
 
     # mass regression
-    fatjets["particleNet_mass"] = fatjets.mass # TODO: Needs a conditional on particleNet presence probably, don't want useless non-zero branches
+    fatjets["particleNet_mass"] = (
+        fatjets.mass
+    )  # TODO: Needs a conditional on particleNet presence probably, don't want useless non-zero branches
     fatjets["particleNet_massraw"] = fatjets.mass
     if "particleNet_massCorr" in fatjets_fields:
         fatjets["particleNet_mass"] = fatjets.mass * fatjets.particleNet_massCorr
         fatjets["particleNet_massraw"] = (
             (1 - fatjets.rawFactor) * fatjets.mass * fatjets.particleNet_massCorr
         )
-    if "particleNet_mass" in fatjets_fields: 
+    if "particleNet_mass" in fatjets_fields:
         fatjets["particleNet_massraw"] = fatjets.particleNet_mass
 
     fatjets["particleNet_mass_legacy"] = fatjets["particleNet_mass"]
@@ -365,9 +374,11 @@ def get_ak8jets(fatjets: FatJetArray): # TODO: This is the goldmine for the vari
         # T for discriminator
         fatjets["ParTTXbb"] = fatjets.globalParT_XbbVsQCD
         # Mass Regression (Raw)
-        fatjets["ParTmassRes"] = fatjets.globalParT_massRes * (1 - fatjets.rawFactor) * fatjets.mass 
+        fatjets["ParTmassRes"] = fatjets.globalParT_massRes * (1 - fatjets.rawFactor) * fatjets.mass
         fatjets["ParTmassVis"] = fatjets.globalParT_massVis * (1 - fatjets.rawFactor) * fatjets.mass
-    elif "globalParT2_Xbb" in fatjets_fields: # Is elif correct here? glopart-v2 and v1 mutually exclusive usually
+    elif (
+        "globalParT2_Xbb" in fatjets_fields
+    ):  # Is elif correct here? glopart-v2 and v1 mutually exclusive usually
         # renamed in Nano v14
         fatjets["ParT2PQCD1HF"] = fatjets.globalParT2_QCD1HF
         fatjets["ParT2PQCD2HF"] = fatjets.globalParT2_QCD2HF
@@ -429,12 +440,14 @@ def get_ak8jets(fatjets: FatJetArray): # TODO: This is the goldmine for the vari
         fatjets["ParT3massGeneric"] = (
             fatjets.globalParT3_massCorrGeneric * (1 - fatjets.rawFactor) * fatjets.mass
         )
-        fatjets["ParT3massCorrFactorX2p"] = fatjets.globalParT3_massCorrX2p 
+        fatjets["ParT3massCorrFactorX2p"] = fatjets.globalParT3_massCorrX2p
         fatjets["ParT3massCorrectedX2p"] = (
             fatjets.globalParT3_massCorrX2p * (1 - fatjets.rawFactor) * fatjets.mass
         )
 
-    if "scoutGlobalParT_prob_Xbb" in fatjets_fields: # This could be an elif since it is mutually exclusive with globalParT3_Xbb; and other taggers
+    if (
+        "scoutGlobalParT_prob_Xbb" in fatjets_fields
+    ):  # This could be an elif since it is mutually exclusive with globalParT3_Xbb; and other taggers
         fatjets["ScoutParTPQCD"] = fatjets.scoutGlobalParT_prob_QCD
 
         # none of these are in scouting; TODO: What are they? Scores for tagging Top-b-W-electron-neutrino etc? What's the use?
@@ -454,20 +467,21 @@ def get_ak8jets(fatjets: FatJetArray): # TODO: This is the goldmine for the vari
         fatjets["ScoutParTPXtauhtauh"] = fatjets.scoutGlobalParT_prob_Xtauhtauh
         fatjets["ScoutParTPXtauhtaum"] = fatjets.scoutGlobalParT_prob_Xtauhtaum
 
-        fatjets["ScoutParTTXbb"] = (
-            fatjets.scoutGlobalParT_prob_Xbb / (
-                fatjets.scoutGlobalParT_prob_Xbb + fatjets.scoutGlobalParT_prob_QCD + fatjets.scoutGlobalParT_prob_Xcs + fatjets.scoutGlobalParT_prob_Xcc + fatjets.scoutGlobalParT_prob_Xgg + fatjets.scoutGlobalParT_prob_Xqq
-            )
+        fatjets["ScoutParTTXbb"] = fatjets.scoutGlobalParT_prob_Xbb / (
+            fatjets.scoutGlobalParT_prob_Xbb
+            + fatjets.scoutGlobalParT_prob_QCD
+            + fatjets.scoutGlobalParT_prob_Xcs
+            + fatjets.scoutGlobalParT_prob_Xcc
+            + fatjets.scoutGlobalParT_prob_Xgg
+            + fatjets.scoutGlobalParT_prob_Xqq
         )
 
         # Correction factors because Patin requested to see them - 24/07/2025
-        fatjets["ScoutParTmassCorrFactorX2p"] = fatjets.scoutGlobalParT_massCorrGenericX2p 
+        fatjets["ScoutParTmassCorrFactorX2p"] = fatjets.scoutGlobalParT_massCorrGenericX2p
         fatjets["ScoutParTmassCorrFactorW2p"] = fatjets.scoutGlobalParT_massCorrGenericW2p
 
         # Regression masses + corrected regression masses
-        fatjets["ScoutParTmassGeneric"] = (
-            fatjets.scoutGlobalParT_massCorrGeneric * fatjets.mass
-        )
+        fatjets["ScoutParTmassGeneric"] = fatjets.scoutGlobalParT_massCorrGeneric * fatjets.mass
         fatjets["ScoutParTmassCorrectedX2p"] = (
             fatjets.scoutGlobalParT_massCorrGenericX2p * fatjets.mass
         )
@@ -567,12 +581,12 @@ def ak4_jets_awayfromak8(
         (jets.pt >= pt)
         & (np.abs(jets.eta) <= eta_max)
         & (ak.all(jets.metric_table(fatjets) > dr_fatjets, axis=2))
-        & ak.all(jets.metric_table(electrons) > dr_leptons, axis=2) 
+        & ak.all(jets.metric_table(electrons) > dr_leptons, axis=2)
         & ak.all(jets.metric_table(muons) > dr_leptons, axis=2)
     )
 
     # return top 2 jets sorted by btagPNetB
-    if sort_by == "btag": # TODO: This probably doesn't work for scouting right now
+    if sort_by == "btag":  # TODO: This probably doesn't work for scouting right now
         jets_pnetb = jets[ak.argsort(jets.btagPNetB, ascending=False)]
         return jets_pnetb[ak4_sel][:, :2]
     # return 2 jets closet to fatjet0 and fatjet1, respectively

@@ -1,24 +1,24 @@
 {
-    "2023BPix": {
+    "2024": {
         "VJetsLO": {
             "subsamples": [
                 # Zto2Q-2Jets samples
-                "Zto2Q-4Jets_HT-200to400_TuneCP5_13p6TeV_madgraphMLM-pythia8",
-                "Zto2Q-4Jets_HT-400to600_TuneCP5_13p6TeV_madgraphMLM-pythia8",
-                "Zto2Q-4Jets_HT-600to800_TuneCP5_13p6TeV_madgraphMLM-pythia8",
-                "Zto2Q-4Jets_HT-800_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+                "Zto2Q-4Jets_HT-200to400",
+                "Zto2Q-4Jets_HT-400to600",
+                "Zto2Q-4Jets_HT-600to800",
+                "Zto2Q-4Jets_HT-800",
                 # Wto2Q-3Jets-HT samples (LO)
-                "Wto2Q-3Jets_HT-200to400_TuneCP5_13p6TeV_madgraphMLM-pythia8",
-                "Wto2Q-3Jets_HT-400to600_TuneCP5_13p6TeV_madgraphMLM-pythia8",
-                "Wto2Q-3Jets_HT-600to800_TuneCP5_13p6TeV_madgraphMLM-pythia8",
-                "Wto2Q-3Jets_HT-800_TuneCP5_13p6TeV_madgraphMLM-pythia8"
+                "Wto2Q-3Jets_HT-200to400",
+                "Wto2Q-3Jets_HT-400to600",
+                "Wto2Q-3Jets_HT-600to800",
+                "Wto2Q-3Jets_HT-800"
             ],
             "files_per_job": 20,
-            "chunksize": 100000 
+            "chunksize": 100000
         },
         "QCD": {
             "subsamples": [
-                "QCD_PT-170to300", 
+                "QCD_PT-170to300",
                 "QCD_PT-300to470",
                 "QCD_PT-470to600",
                 "QCD_PT-600to800",
@@ -43,22 +43,22 @@
         "VJetsLO": {
             "subsamples": [
                 # Zto2Q-2Jets samples
-                "Zto2Q-4Jets_HT-200to400_TuneCP5_13p6TeV_madgraphMLM-pythia8",
-                "Zto2Q-4Jets_HT-400to600_TuneCP5_13p6TeV_madgraphMLM-pythia8",
-                "Zto2Q-4Jets_HT-600to800_TuneCP5_13p6TeV_madgraphMLM-pythia8",
-                "Zto2Q-4Jets_HT-800_TuneCP5_13p6TeV_madgraphMLM-pythia8",
+                "Zto2Q-4Jets_HT-200to400",
+                "Zto2Q-4Jets_HT-400to600",
+                "Zto2Q-4Jets_HT-600to800",
+                "Zto2Q-4Jets_HT-800",
                 # Wto2Q-3Jets-HT samples (LO)
-                "Wto2Q-3Jets_HT-200to400_TuneCP5_13p6TeV_madgraphMLM-pythia8",
-                "Wto2Q-3Jets_HT-400to600_TuneCP5_13p6TeV_madgraphMLM-pythia8",
-                "Wto2Q-3Jets_HT-600to800_TuneCP5_13p6TeV_madgraphMLM-pythia8",
-                "Wto2Q-3Jets_HT-800_TuneCP5_13p6TeV_madgraphMLM-pythia8"
+                "Wto2Q-3Jets_HT-200to400",
+                "Wto2Q-3Jets_HT-400to600",
+                "Wto2Q-3Jets_HT-600to800",
+                "Wto2Q-3Jets_HT-800"
             ],
             "files_per_job": 20,
-            "chunksize": 100000 
+            "chunksize": 100000
         },
         "QCD": {
             "subsamples": [
-                "QCD_PT-170to300", 
+                "QCD_PT-170to300",
                 "QCD_PT-300to470",
                 "QCD_PT-470to600",
                 "QCD_PT-600to800",

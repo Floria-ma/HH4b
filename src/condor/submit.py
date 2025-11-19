@@ -8,18 +8,19 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 from math import ceil
 from pathlib import Path
 from string import Template
-import subprocess
 
 from HH4b import run_utils
 
-from concurrent.futures import ThreadPoolExecutor
 
 def condor_submit(jdl):
     subprocess.run(["condor_submit", jdl], check=True)
+
 
 t2_redirectors = {
     "lpc": "root://cmseos.fnal.gov//",
@@ -49,7 +50,7 @@ def main(args):
         except:
             print("No valid proxy. Exiting.")
             exit(1)
-    elif args.site == "ucsd": 
+    elif args.site == "ucsd":
         if username == "rkansal":
             proxy = "/home/users/rkansal/x509up_u31735"
         elif username == "dprimosc":
@@ -72,9 +73,9 @@ def main(args):
     # make eos dir
     if args.site == "cern":
         pdir = Path(f"eos/user/{username[0]}/{username}/bbbb/{args.processor}/")
-    else: 
+    else:
         pdir = Path(f"store/user/{username}/bbbb/{args.processor}/")
-        
+
     outdir = pdir / tag
 
     # make local directory

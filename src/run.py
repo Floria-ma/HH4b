@@ -94,7 +94,7 @@ def run(p: processor, fileset: dict, skipbadfiles: bool, args):
     run_utils.add_mixins(nanoevents)  # update nanoevents schema
 
     # outputs are saved here as pickles
-    outdir = "./outfiles" # "/eos/user/e/eheikkil/cutflow_checking/"
+    outdir = "./outfiles"  # "/eos/user/e/eheikkil/cutflow_checking/"
     os.system(f"mkdir -p {outdir}")
 
     save_parquet = {
@@ -260,7 +260,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("--yaml", default=None, help="yaml file", type=str)
     # parser.add_argument("--use-scouting", action="store_true", help="use scouting variables in processor")
-    
 
     args = parser.parse_args()
 

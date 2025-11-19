@@ -683,7 +683,7 @@ def get_templates(
         )
 
         cutflow_dir = Path(template_dir) / "cutflows" / year
-        cutflow_dir.mkdir(parents=True, exist_ok=True) 
+        cutflow_dir.mkdir(parents=True, exist_ok=True)
 
         if template_dir != "":
             cf = cf.round(2)

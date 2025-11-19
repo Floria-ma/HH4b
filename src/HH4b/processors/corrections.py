@@ -62,12 +62,13 @@ def get_pog_json(obj: str, year: str) -> str:
         print(f"No json for {obj}")
 
     year = get_UL_year(year) if year == "2018" else year
-    if "2022" in year or "2023" in year:
+    if "2022" in year or "2023" in year or "2024" in year:
         year = {
             "2022": "2022_Summer22",
             "2022EE": "2022_Summer22EE",
             "2023": "2023_Summer23",
             "2023BPix": "2023_Summer23BPix",
+            "2024": "2024_Winter24",
         }[year]
     return f"{pog_correction_path}/POG/{pog_json[0]}/{year}/{pog_json[1]}"
 
@@ -99,6 +100,22 @@ def add_pileup_weight(weights: Weights, year: str, nPU: np.ndarray, dataset: str
         sf = pileup_correction[nPU]
         # no uncertainties
         weights.add("pileup", sf)
+    elif "2024" in year:
+        # public pileup corrections not available yet
+        path_pileup = package_path + "/corrections/data/pileup/PileupReweight_Summer24.root"
+        corr_file = uproot.open(path_pileup)
+
+        pileup_MC = corr_file["simul_hist"].to_numpy()[0]
+
+        pileup_data_nom = corr_file["data_hist"].to_numpy()[0]
+        pileup_data_up = corr_file["data_hist_up"].to_numpy()[0]
+        pileup_data_down = corr_file["data_hist_down"].to_numpy()[0]
+
+        sf_nom = np.clip(pileup_data_nom / pileup_MC, 0, 10)[nPU]
+        sf_up = np.clip(pileup_data_up / pileup_MC, 0, 10)[nPU]
+        sf_down = np.clip(pileup_data_down / pileup_MC, 0, 10)[nPU]
+
+        weights.add("pileup", sf_nom, sf_up, sf_down)
 
     else:
         # https://twiki.cern.ch/twiki/bin/view/CMS/LumiRecommendationsRun3
@@ -111,6 +128,7 @@ def add_pileup_weight(weights: Weights, year: str, nPU: np.ndarray, dataset: str
             "2022EE": "Collisions2022_359022_362760_eraEFG_GoldenJson",
             "2023": "Collisions2023_366403_369802_eraBC_GoldenJson",
             "2023BPix": "Collisions2023_369803_370790_eraD_GoldenJson",
+            "2024": "Collisions2023_369803_370790_eraD_GoldenJson",  # need to correct this
         }[year]
         # evaluate and clip up to 10 to avoid large weights
         values["nominal"] = np.clip(cset[corr].evaluate(nPU, "nominal"), 0, 10)
@@ -221,9 +239,9 @@ def get_scale_weights(events):
 
 
 class JECs:
-    def __init__(self, year, use_scouting = False):
-        if year in ["2022", "2022EE", "2023", "2023BPix"]: # Temporary scouting test below
-            # jec_compiled = package_path + "/corrections/jec_compiled.pkl.gz"
+    def __init__(self, year, use_scouting=False):
+        if year in ["2022", "2022EE", "2023", "2023BPix", "2024"]:  # Temporary scouting test below
+            jec_compiled = package_path + "/corrections/jec_compiled.pkl.gz"
             if not use_scouting:
                 jec_compiled = package_path + "/corrections/jec_compiled.pkl.gz"
             else:
@@ -244,10 +262,12 @@ class JECs:
             self.jet_factory["ak8"] = jmestuff["fatjet_factory"]
             self.met_factory = jmestuff["met_factory"]
 
-    def _add_jec_variables(self, jets: JetArray, event_rho: ak.Array, isData: bool, use_scouting: bool = False) -> JetArray:
+    def _add_jec_variables(
+        self, jets: JetArray, event_rho: ak.Array, isData: bool, use_scouting: bool = False
+    ) -> JetArray:
         """add variables needed for JECs"""
         if not use_scouting:
-            jets["pt_raw"] = (1 - jets.rawFactor) * jets.pt 
+            jets["pt_raw"] = (1 - jets.rawFactor) * jets.pt
             jets["mass_raw"] = (1 - jets.rawFactor) * jets.mass
             jets["event_rho"] = ak.broadcast_arrays(event_rho, jets.pt)[0]
             if not isData:
@@ -263,7 +283,7 @@ class JECs:
 
         return jets
 
-    def get_jec_jets( 
+    def get_jec_jets(
         self,
         events: NanoEventsArray,
         jets: FatJetArray,
@@ -281,13 +301,13 @@ class JECs:
         """
         if not use_scouting:
             rho = (
-                events.Rho.fixedGridRhoFastjetAll # TODO: What is this? Rho? Answer: some correction sensitive for pileup
+                events.Rho.fixedGridRhoFastjetAll  # TODO: What is this? Rho? Answer: some correction sensitive for pileup
                 if "Rho" in events.fields
                 else events.fixedGridRhoFastjetAll
             )
         else:
             rho = (
-                events.ScoutingRho.fixedGridRhoFastjetAll # TODO: What is this? Rho? Answer: some correction sensitive for pileup
+                events.ScoutingRho.fixedGridRhoFastjetAll  # TODO: What is this? Rho? Answer: some correction sensitive for pileup
                 if "ScoutingRho" in events.fields
                 else events.fixedGridRhoFastjetAll
             )
@@ -299,7 +319,7 @@ class JECs:
 
         if not ("v12" in nano_version or "v15_scouting" in nano_version):
             apply_jecs = False
-    
+
         if not apply_jecs:
             return jets, None
 
@@ -330,7 +350,9 @@ class JECs:
             elif year == "2023":
                 corr_key = "2023_runCv4" if "Run2023Cv4" in dataset else "2023_runCv123"
             elif year == "2023BPix":
-                corr_key = "2023BPix_runD"
+                corr_key = ("2023BPix_runD",)
+            elif year == "2024":
+                corr_key = "2024"
             else:
                 print(dataset, year)
                 print("warning, no valid dataset, JECs won't be applied to data")
@@ -340,7 +362,7 @@ class JECs:
 
         print("corr_key", corr_key)
         # fatjet_factory.build gives an error if there are no jets in event
-        if apply_jecs:  
+        if apply_jecs:
             jets = self.jet_factory[jet_factory_str][corr_key].build(jets, jec_cache)
 
         # return only jets if no variations are given
@@ -428,6 +450,7 @@ def get_jetveto_event(jets: JetArray, year: str):
         "2022EE": "Summer22EE_23Sep2023_RunEFG_V1",
         "2023": "Summer23Prompt23_RunC_V1",
         "2023BPix": "Summer23BPixPrompt23_RunD_V1",
+        "2024": "Winter24Prompt2024BCDEFGHI_V1",
     }[year]
 
     jet_veto = get_veto(j, nj, corr_str) > 0

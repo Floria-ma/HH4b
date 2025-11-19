@@ -5,6 +5,7 @@ Author(s): Raghav Kansal
 
 from __future__ import annotations
 
+import json
 import logging
 from abc import abstractmethod
 from pathlib import Path
@@ -12,7 +13,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from coffea import processor
-import json
 
 from HH4b.hh_vars import LUMI
 
@@ -32,7 +32,7 @@ class SkimmerABC(processor.ProcessorABC):
         save_ak15 (bool, optional): save ak15 jets as well, for HVV candidate
     """
 
-    with open("src/HH4b/xsecs.json", "r") as f:
+    with open("src/HH4b/xsecs.json") as f:
         XSECS = json.load(f)
 
     def to_pandas(self, events: dict[str, np.array]):

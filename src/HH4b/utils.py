@@ -9,18 +9,18 @@ from __future__ import annotations
 import contextlib
 import logging
 import logging.config
+import os
 import pickle
 import time
 import warnings
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-import os
-import pyarrow.parquet as pq
 
 import hist
 import numpy as np
 import pandas as pd
+import pyarrow.parquet as pq
 import vector
 from hist import Hist
 
@@ -169,7 +169,7 @@ def get_pickles(pickles_path, year, sample_name):
     from coffea.processor.accumulator import accumulate
 
     out_pickles = [str(p.name) for p in pickles_path.iterdir() if str(p.name) != ".DS_Store"]
-    
+
     if not out_pickles:  # Handle empty directory case
         warnings.warn(f"No pickle files found in {pickles_path}", stacklevel=1)
         return {}
@@ -180,7 +180,7 @@ def get_pickles(pickles_path, year, sample_name):
         with Path(f"{pickles_path}/{first_file}").open("rb") as file:
             out = pickle.load(file)[year][sample_name]
     except Exception as e:
-        warnings.warn(f"Failed to load {first_file}: {str(e)}", stacklevel=1)
+        warnings.warn(f"Failed to load {first_file}: {e!s}", stacklevel=1)
         return {}
 
     # Accumulate remaining files
@@ -190,7 +190,7 @@ def get_pickles(pickles_path, year, sample_name):
                 out_dict = pickle.load(file)[year][sample_name]
                 out = accumulate([out, out_dict])
         except Exception as e:
-            warnings.warn(f"Failed to load {file_name}: {str(e)}", stacklevel=1)
+            warnings.warn(f"Failed to load {file_name}: {e!s}", stacklevel=1)
             continue
 
     return out
@@ -242,7 +242,9 @@ def _normalize_weights(
         return
 
     # check weights are scaled
-    if "weight_noxsec" in events.columns and np.array_equal(events["weight"].values, events["weight_noxsec"].values):
+    if "weight_noxsec" in events.columns and np.array_equal(
+        events["weight"].values, events["weight_noxsec"].values
+    ):
 
         if "VBF" in sample:
             warnings.warn(
@@ -256,15 +258,12 @@ def _normalize_weights(
     events["finalWeight"] = events["weight"] / totals["np_nominal"]
 
     if not variations:
-        if weight_shifts is not None:
-            print("Weight shifts provided but variations set to false. Note that this will not normalize the variations")
         return
 
     if weight_shifts is None:
         raise ValueError(
             "Variations requested but no weight shifts given! Please use ``variations=False`` or provide the systematics to be normalized."
         )
-    
 
     # normalize all the variations
     for wvar in weight_shifts:
@@ -312,6 +311,7 @@ def _reorder_txbb(events: pd.DataFrame, txbb):
         if key.startswith("bbFatJet"):
             events[key] = np.take_along_axis(events[key].to_numpy(), bbord, axis=1)
 
+
 def load_samples(
     data_dir: Path,
     samples: dict[str, str],
@@ -350,25 +350,32 @@ def load_samples(
 
             try:
                 non_empty_passed_list = []
-                for parquet_file in parquet_path.glob("[!.]*.parquet"): # I sometimes got system files which we don't want, e.g. ".sys.v#.out_1863.parquet" so I filter them out with the [!.] part
+                for parquet_file in parquet_path.glob(
+                    "[!.]*.parquet"
+                ):  # I sometimes got system files which we don't want, e.g. ".sys.v#.out_1863.parquet" so I filter them out with the [!.] part
                     try:
                         meta = pq.ParquetFile(parquet_file).metadata
                         if meta.num_rows == 0:
                             # empty file, skip
                             continue
 
-                        df_sample = pd.read_parquet(parquet_file, filters=filters, columns=load_columns)
-                        if not df_sample.empty: # In case filters get rid of all rows
+                        df_sample = pd.read_parquet(
+                            parquet_file, filters=filters, columns=load_columns
+                        )
+                        if not df_sample.empty:  # In case filters get rid of all rows
                             non_empty_passed_list.append(df_sample)
                     except Exception as e:
-                        warnings.warn(f"Error when reading parquet file {parquet_file}. Error: {e}", stacklevel=1)
+                        warnings.warn(
+                            f"Error when reading parquet file {parquet_file}. Error: {e}",
+                            stacklevel=1,
+                        )
                         continue
-                
+
                 if not non_empty_passed_list:
                     continue
-                    
+
                 events = pd.concat(non_empty_passed_list)
-                
+
                 if events.empty:
                     warnings.warn(f"No events for {sample}!", stacklevel=1)
                     continue
@@ -378,7 +385,6 @@ def load_samples(
 
                 pickles = get_pickles(sample_path / "pickles", year, sample)
                 if "totals" in pickles:
-                    print("Normalizing using pickles")
                     totals = pickles["totals"]
                     _normalize_weights(
                         events,
@@ -401,15 +407,17 @@ def load_samples(
 
             except Exception as e:
                 warnings.warn("Made it to the exception block!")
-                warnings.warn(f"Error loading {sample}: {str(e)}", stacklevel=1)
+                warnings.warn(f"Error loading {sample}: {e!s}", stacklevel=1)
                 continue
 
-        if label in events_dict and events_dict[label]:
+        if events_dict.get(label):
             events_dict[label] = pd.concat(events_dict[label])
         else:
             events_dict.pop(label, None)
 
     return events_dict
+
+
 # eetu mid
 # def load_samples(
 #     data_dir: Path,
@@ -682,8 +690,6 @@ def load_samples(
 #     return events_dict
 
 
-
-
 def add_to_cutflow(
     events_dict: dict[str, pd.DataFrame],
     key: str,
@@ -739,6 +745,22 @@ def get_feat(events: pd.DataFrame, feat: str):
         return np.nan_to_num(events[feat[:-1]].to_numpy()[:, int(feat[-1])].squeeze(), -1)
 
     return None
+
+
+'''
+def get_feat(events, feat):
+    """
+    Extracts a feature value, supporting both MultiIndex ('bbFatJetPt', '0')
+    and flat-column naming (bbFatJetPt0) conventions.
+    """
+    try:
+        # Try MultiIndex-style columns
+        return np.nan_to_num(events[feat[:-1]].to_numpy()[:, int(feat[-1])].squeeze(), -1)
+    except KeyError:
+        # Fallback: flat column names like bbFatJetPt0
+        col = f"{feat[:-1]}{feat[-1]}"
+        return np.nan_to_num(events[col].to_numpy().squeeze(), -1)
+'''
 
 
 def tau32FittedSF_4(events: pd.DataFrame):

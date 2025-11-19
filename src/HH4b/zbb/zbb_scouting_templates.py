@@ -1,32 +1,30 @@
 from __future__ import annotations
 
-import argparse
 import itertools
-from collections import OrderedDict
 from pathlib import Path
-import correctionlib
 
-import numpy as np
+import correctionlib
 import pandas as pd
 
 from HH4b import postprocessing, utils
 
 YEARS = [
     "2023",
-    #"2023BPix"
-    ]
+    # "2023BPix"
+]
 YEARS_COMBINED_DICT = {
-    "2023": 
-        [
-        "2023", 
-        #"2023BPix"
-         ]
-    }
+    "2023": [
+        "2023",
+        # "2023BPix"
+    ]
+}
 
 TAG = "28Aug2025_NewJECS_v15_scouting_zbb"
 DATA_DIR = f"/eos/user/e/eheikkil/bbbb/skimmer/{TAG}"
 OUTDIR = f"/eos/user/e/eheikkil/scouting/templates/{TAG}"
-PERSISTENT_PATH = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scouting_events_withprobs.pkl")
+PERSISTENT_PATH = Path(
+    f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scouting_events_withprobs.pkl"
+)
 # PERSISTENT_PATH_ERAS = Path(f"/eos/user/e/eheikkil/scouting/templates/{TAG}/scouting_events_withprobs_eras.pkl")
 PERSISTENT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -40,14 +38,15 @@ M_LOW = 50.0
 M_HIGH = 150.0
 
 SAMPLES_DICT = {
-    "data": ["Run2023C", "Run2023D"], # It is important that this d in the "data" key be lower case
+    "data": ["Run2023C", "Run2023D"],  # It is important that this d in the "data" key be lower case
     "Zto2Q": ["Zto2Q-2Jets"],
     "Wto2Q": ["Wto2Q-2Jets"],
-    "qcd": ["QCD"] # Same with lowercase q here
+    "qcd": ["QCD"],  # Same with lowercase q here
 }
 MC_SAMPLES_LIST = [k for k in SAMPLES_DICT if k != "data"]
 
-APPLY_Zto2Q_CORR = True # TIODO: Can't use right now because 2023BPix is implemented correctly but 2023 might not work? Need loop over years and clarification with combined events dict
+APPLY_Zto2Q_CORR = True  # TIODO: Can't use right now because 2023BPix is implemented correctly but 2023 might not work? Need loop over years and clarification with combined events dict
+
 
 def categorize_zto2q(events_dict):
     for year in events_dict:
@@ -64,6 +63,7 @@ def categorize_zto2q(events_dict):
         events_dict[year]["Zto2Q_QQ"] = df[is_ZQQ & matched]
         events_dict[year]["Zto2Q_unmatched"] = df[~matched]
 
+
 def create_templates(events_dict):
     pt_branch = "bbFatJetPt0"
     mass_branch = "bbFatJetScoutParTmassCorrectedX2p0"
@@ -77,25 +77,23 @@ def create_templates(events_dict):
         txbb_high_str = str(txbb_high).replace(".", "p")
         pt_low_str = str(pt_low)
         pt_high_str = str(pt_high)
-        region_key = (
-            f"pass_TXbb{txbb_low_str}to{txbb_high_str}_pT{pt_low_str}to{pt_high_str}"
-        )
+        region_key = f"pass_TXbb{txbb_low_str}to{txbb_high_str}_pT{pt_low_str}to{pt_high_str}"
         selection_regions[region_key] = postprocessing.Region(
             cuts={
                 pt_branch: [pt_low, pt_high],
                 mass_branch: [M_LOW, M_HIGH],
-                txbb_branch: [txbb_low, txbb_high]
+                txbb_branch: [txbb_low, txbb_high],
             },
-            label=region_key
+            label=region_key,
         )
 
     selection_regions["fail"] = postprocessing.Region(
         cuts={
             pt_branch: [PT_BINS[0], PT_BINS[-1]],
             mass_branch: [M_LOW, M_HIGH],
-            txbb_branch: [0.1, TXBB_BINS[0]]
+            txbb_branch: [0.1, TXBB_BINS[0]],
         },
-        label="fail"
+        label="fail",
     )
 
     shape_var = postprocessing.ShapeVar(
@@ -116,9 +114,11 @@ def create_templates(events_dict):
     bg_order = list(reversed(bg_keys))
 
     for year in events_dict:
-        bg_keys_filtered = [k for k in bg_keys if k in events_dict[year] and not events_dict[year][k].empty] # hot fix
+        bg_keys_filtered = [
+            k for k in bg_keys if k in events_dict[year] and not events_dict[year][k].empty
+        ]  # hot fix
 
-        plot_dir=Path(OUTDIR) / "plots" / year
+        plot_dir = Path(OUTDIR) / "plots" / year
         plot_dir.mkdir(parents=True, exist_ok=True)
 
         templates = postprocessing.get_templates(
@@ -145,6 +145,7 @@ def create_templates(events_dict):
             pd.to_pickle(templates, f)
         print(f"Saved templates for {year} to {out_pkl}")
 
+
 def main():
     events_dict = {}
     common_columns = [
@@ -154,12 +155,12 @@ def main():
         ("bbFatJetMass", 2),
         ("bbFatJetScoutParTmassGeneric", 2),
         ("bbFatJetScoutParTmassCorrectedX2p", 2),
-        # ("bbFatJetScoutParTmassCorrectedW2p", 2), 
+        # ("bbFatJetScoutParTmassCorrectedW2p", 2),
         ("bbFatJetScoutParTTXbb", 2),
         # ("bbFatJetScoutParTPXbb", 2), # Raw probability bbFatJetScoutParTPXbb0
         # ("bbFatJetParT3massGeneric", 2), # Comment in / out if using scouting vs. offline variables NOTE: Offline vars wont work with scouting data, only MC where we added noprmal reco to scouting MC as well
         # ("bbFatJetParT3massCorrectedX2p", 2),
-        # ("bbFatJetParT3massCorrectedW2p", 2), 
+        # ("bbFatJetParT3massCorrectedW2p", 2),
         # ("bbFatJetParT3TXbb", 2),
         ("weight", 1),
     ]
@@ -171,11 +172,7 @@ def main():
         ("GenZCC", 1),
     ]
 
-    mc_columns = {
-        "Zto2Q": zto2q_columns,
-        "Wto2Q": [],
-        "qcd": []
-    }
+    mc_columns = {"Zto2Q": zto2q_columns, "Wto2Q": [], "qcd": []}
 
     if not PERSISTENT_PATH.exists():
         for year in YEARS:
@@ -202,7 +199,7 @@ def main():
                         weight_shifts=None,
                         load_weight_noxsec=True,
                     )
-                    
+
                     if sample not in loaded or loaded[sample].empty:
                         print(f"No data loaded for {sample} in year {year}. Skipping")
                         continue
@@ -250,7 +247,9 @@ def main():
         corr_dict = None
         print("Z->2Q corrections are not applied.")
 
-    if APPLY_Zto2Q_CORR: # TODO: Scouting analysis needs this redone? TODO: This also needs to be redone when multiple years are used, e.g. 2023 and 2023BPix
+    if (
+        APPLY_Zto2Q_CORR
+    ):  # TODO: Scouting analysis needs this redone? TODO: This also needs to be redone when multiple years are used, e.g. 2023 and 2023BPix
         print("Applying Zto2Q corrections...")
         for year in YEARS_COMBINED_DICT:
             # apply corrections to the events
@@ -269,7 +268,6 @@ def main():
             events_combined[year]["Zto2Q"]["weight_GenZPtUp"] = weight * sf_up
             events_combined[year]["Zto2Q"]["weight_GenZPtDown"] = weight * sf_down
         print("Zto2Q corrections applied")
-
 
         # print("Applying Z->2Q corrections from ZMuMu measurement...")
         # corr_dir = Path("ZMuMu_corrs")
@@ -300,11 +298,10 @@ def main():
     else:
         corr_dict = None
         print("Z->2Q corrections are not applied.")
-    
-
 
     categorize_zto2q(events_combined)
     create_templates(events_combined)
+
 
 if __name__ == "__main__":
     main()

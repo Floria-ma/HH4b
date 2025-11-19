@@ -1,0 +1,65 @@
+{
+    "2024": {
+        "VJets": {
+            "subsamples": [
+                # Zto2Q-4Jets samples
+                "Zto2Q-4Jets_Bin-HT-100to400",
+                "Zto2Q-4Jets_Bin-HT-400to800",
+                "Zto2Q-4Jets_Bin-HT-800to1500",
+                "Zto2Q-4Jets_Bin-HT-1500to2500",
+                "Zto2Q-4Jets_Bin-HT-2500",
+                # Wto2Q-3Jets samples
+                "Wto2Q-3Jets_Bin-HT-100to400",
+                "Wto2Q-3Jets_Bin-HT-400to800",
+                "Wto2Q-3Jets_Bin-HT-800to1500",
+                "Wto2Q-3Jets_Bin-HT-1500to2500",
+                "Wto2Q-3Jets_Bin-HT-2500",
+            ],
+            "files_per_job": 10,
+            "chunksize": 8000
+        },
+        "QCD": {
+            "subsamples": [
+                "QCD-4Jets_Bin-HT-100to200",
+                "QCD-4Jets_Bin-HT-200to400",
+                "QCD-4Jets_Bin-HT-400to600",
+                "QCD-4Jets_Bin-HT-600to800",
+                "QCD-4Jets_Bin-HT-800to1000",
+                "QCD-4Jets_Bin-HT-1000to1200",
+                "QCD-4Jets_Bin-HT-1200to1500",
+                "QCD-4Jets_Bin-HT-1500to2000",
+                "QCD-4Jets_Bin-HT-2000",
+            ],
+            "files_per_job": 20,
+            "chunksize": 8000
+        },
+        "Hbb": {
+            "subsamples": [
+                "GluGluH-Hto2B",
+            ],
+            "files_per_job": 10,
+            "chunksize": 8000
+        },
+        "TT": {
+            "subsamples": [
+                "TTto4Q",
+            ],
+            "files_per_job": 5,
+            "chunksize": 8000
+        },
+        "Data": {
+            "subsamples": [
+                "Run2024B",
+                "Run2024C",
+                "Run2024D",
+                "Run2024E",
+                "Run2024F",
+                "Run2024G",
+                "Run2024H",
+                "Run2024I"
+            ],
+            "files_per_job": 1,
+            "chunksize": 1000000
+        }
+    }
+}
