@@ -26,7 +26,7 @@ m_low, m_high = 40, 180
 bin_width = 5
 n_mass_bins = int((m_high - m_low) / bin_width)
 
-STORAGE_PROJ_DIR = Path("/eos/user/e/eheikkil/bbbb/")
+STORAGE_PROJ_DIR = Path("/eos/user/z/zima/bbbb/")
 DATA_DIR = STORAGE_PROJ_DIR / f"skimmer/{tag}"
 PROCESSED_DIR = STORAGE_PROJ_DIR / f"scouting/templates/{tag}"
 # PROCESSED_DIR = Path("processed")
@@ -485,7 +485,7 @@ if APPLY_Z_RECOIL_CORR:
     )
 
 for year in YEARS_COMBINED_DICT:
-    out_dir = Path(f"/eos/user/e/eheikkil/scouting/templates/{tag}/")
+    out_dir = Path(f"/eos/user/z/zima/scouting/templates/{tag}/")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     template_dir = out_dir

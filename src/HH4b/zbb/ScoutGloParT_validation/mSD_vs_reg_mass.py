@@ -44,7 +44,7 @@ if SCOUTING:
 else:
     details = offline_details
 
-SKIMMER_DIR = "/eos/user/e/eheikkil/bbbb/skimmer"
+SKIMMER_DIR = "/eos/user/z/zima/bbbb/skimmer"
 YEARS = ["2023", "2023BPix"]
 TAG = details["tag"]
 YEAR_DIRS = [f"{SKIMMER_DIR}/{TAG}/{YEAR}" for YEAR in YEARS]

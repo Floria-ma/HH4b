@@ -14,12 +14,12 @@ hep.style.use("CMS")
 # config
 REPROCESS = True
 
-SKIMMER_DIR = "/eos/user/e/eheikkil/bbbb/skimmer"
+SKIMMER_DIR = "/eos/user/z/zima/bbbb/skimmer"
 YEARS = ["2023", "2023BPix"]
 TAG = "13Feb2026_Data_Standard_Cuts_QCD_Inclusive_v15_scouting_zbb"
 YEAR_DIRS = [f"{SKIMMER_DIR}/{TAG}/{y}" for y in YEARS]
 
-OUTDIR = "/eos/user/e/eheikkil/MASS_DECORRELATION_EFFORTS/NoSmoothing/outputs"
+OUTDIR = "/eos/user/z/zima/MASS_DECORRELATION_EFFORTS/NoSmoothing/outputs"
 os.makedirs(OUTDIR, exist_ok=True)
 FILENAME = f"{OUTDIR}/second_bins_TXBBPRECUT0p3.pkl"
 

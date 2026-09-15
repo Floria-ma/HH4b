@@ -54,13 +54,13 @@ mpl.rcParams["lines.linewidth"] = 2
 mpl.rcParams["figure.dpi"] = 400
 mpl.rcParams["figure.edgecolor"] = "none"
 
-SKIMMER_DIR = "/eos/user/e/eheikkil/bbbb/skimmer"
+SKIMMER_DIR = "/eos/user/z/zima/bbbb/skimmer"
 YEARS = ["2023", "2023BPix"]
 TAG =  "07Feb2026_PTl450TXbb0p3_PTsl200_HT1000_v15_scouting_zbb" if not SCOUTING else "14Feb2026_VJets_TT_Only_v15_scouting_zbb"
 YEAR_DIRS = [f"{SKIMMER_DIR}/{TAG}/{YEAR}" for YEAR in YEARS]
 REPROCESS = True
 
-SAVE_TO = "/eos/user/e/eheikkil/DATA_SPECTRA"
+SAVE_TO = "/eos/user/z/zima/DATA_SPECTRA"
 SAVE_TO_FILE = f"{SAVE_TO}/saved_aggregate_dict.pkl"
 RESULTS_DIR = f"{SAVE_TO}/results"
 os.makedirs(RESULTS_DIR, exist_ok = True)
@@ -466,7 +466,7 @@ def compare_shapes_in_pt_region(
     return fig
 
 
-def save_results(aggregate_dict, out_file="/eos/user/e/eheikkil/DATA_SPECTRA/saved_aggregate_dict.pkl"):
+def save_results(aggregate_dict, out_file="/eos/user/z/zima/DATA_SPECTRA/saved_aggregate_dict.pkl"):
     """Save histograms and summary to files"""
     
     with open(out_file, 'wb') as f:

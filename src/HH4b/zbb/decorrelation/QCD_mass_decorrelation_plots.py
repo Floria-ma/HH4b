@@ -46,13 +46,13 @@ details = scouting_details if SCOUTING else offline_details
 filename_suffix = details["filename_suffix"]
 mass_variable = details["mass_var"]
 
-SKIMMER_DIR = "/eos/user/e/eheikkil/bbbb/skimmer"
+SKIMMER_DIR = "/eos/user/z/zima/bbbb/skimmer"
 YEARS = ["2023BPix", "2023"]
 TAG = "13Feb2026_Data_Standard_Cuts_QCD_Inclusive_v15_scouting_zbb" if SCOUTING else "06Feb2025_QCD_Offline_Inclusive_PTl_300_etaS_HT_1k_v15_scouting_zbb"
 YEAR_DIR = [f"{SKIMMER_DIR}/{TAG}/{YEAR}" for YEAR in YEARS]
 REPROCESS = False
 
-SAVE_TO = "/eos/user/e/eheikkil/QCD_SPECTRA"
+SAVE_TO = "/eos/user/z/zima/QCD_SPECTRA"
 SAVE_TO_FILE = f"{SAVE_TO}/saved_aggregate_dict_{filename_suffix}_{mass_variable}.pkl"
 RESULTS_DIR = f"{SAVE_TO}/results"
 os.makedirs(RESULTS_DIR, exist_ok=True)

@@ -51,7 +51,7 @@ details = scouting_details if SCOUTING else offline_details
 mass_variable = details["mass_var"]
 txbb_variable = details["txbb_var"]
 
-SKIMMER_DIR = "/eos/user/e/eheikkil/bbbb/skimmer"
+SKIMMER_DIR = "/eos/user/z/zima/bbbb/skimmer"
 YEARS = ["2023BPix", "2023"]
 
 TAG = (
@@ -62,7 +62,7 @@ TAG = (
 
 YEAR_DIR = [f"{SKIMMER_DIR}/{TAG}/{YEAR}" for YEAR in YEARS]
 
-SAVE_TO = "/eos/user/e/eheikkil/QCD_SPECTRA"
+SAVE_TO = "/eos/user/z/zima/QCD_SPECTRA"
 RESULTS_DIR = f"{SAVE_TO}/results"
 os.makedirs(RESULTS_DIR, exist_ok=True)
 

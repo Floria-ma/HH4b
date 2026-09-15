@@ -47,7 +47,7 @@ YEARS_COMBINED_DICT = {
 # tag = "ZbbHT25July31_v14_25v2_zbb"
 tag = "11Feb2026_StandardOfflineCuts_v15_scouting_zbb" #"07Feb2026_PTl450TXbb0p3_PTsl200_HT1000_v15_scouting_zbb" #"05Feb2026_offline_v15_scouting_zbb"
 
-STORAGE_PROJ_DIR = Path("/eos/user/e/eheikkil/bbbb/")
+STORAGE_PROJ_DIR = Path("/eos/user/z/zima/bbbb/")
 DATA_DIR = STORAGE_PROJ_DIR / f"skimmer/{tag}"
 PROCESSED_DIR = STORAGE_PROJ_DIR / f"scouting/templates/{tag}"
 # PROCESSED_DIR = Path("processed")
@@ -681,7 +681,7 @@ else:
 
 
 for year in YEARS_COMBINED_DICT:
-    out_dir = Path(f"/eos/user/e/eheikkil/scouting/templates/{tag}/")
+    out_dir = Path(f"/eos/user/z/zima/scouting/templates/{tag}/")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     template_dir = out_dir

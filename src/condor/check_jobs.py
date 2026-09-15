@@ -26,7 +26,7 @@ parser.add_argument(
 
 parser.add_argument("--tag", default="", help="tag for jobs", type=str)
 parser.add_argument("--year", default="2017", help="year", type=str)
-parser.add_argument("--user", default="eheikkil", help="user", type=str)
+parser.add_argument("--user", default=os.environ["USER"], help="user", type=str)
 parser.add_argument("--location", default="cern", help="fermilab, ucsd or cern", type=str)
 run_utils.add_bool_arg(parser, "submit-missing", default=False, help="submit missing files")
 run_utils.add_bool_arg(

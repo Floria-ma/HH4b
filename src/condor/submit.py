@@ -244,7 +244,7 @@ def parse_args(parser):
         parser, "submit", default=False, help="submit files as well as create them"
     )
     parser.add_argument("--git-branch", required=True, help="git branch to use", type=str)
-    parser.add_argument("--git-user", default="eetheik", help="which user's repo to use", type=str)
+    parser.add_argument("--git-user", default="Floria-ma", help="which user's repo to use", type=str)
     run_utils.add_bool_arg(
         parser,
         "allow-diff-local-repo",

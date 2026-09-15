@@ -28,7 +28,7 @@ n_mass_bins = int((m_high - m_low) / bin_width)
 tag = "14Feb2026_VJets_TT_Only_v15_scouting_zbb" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
 
 
-STORAGE_PROJ_DIR = Path("/eos/user/e/eheikkil/bbbb/")
+STORAGE_PROJ_DIR = Path("/eos/user/z/zima/bbbb/")
 DATA_DIR = STORAGE_PROJ_DIR / f"skimmer/{tag}"
 PROCESSED_DIR = STORAGE_PROJ_DIR / f"scouting/templates/{tag}"
 # PROCESSED_DIR = Path("processed")
@@ -91,7 +91,7 @@ def load_qsurf(alpha: float, mvar: str, qsurf_dir: str):
 
     return qsurf, pt_edges, rho_edges
 
-qsurf, pt_edges, rho_edges = load_qsurf(alpha = 0.995, mvar = "mX2p", qsurf_dir = "/afs/cern.ch/user/e/eheikkil/private/HH4b/src/HH4b/zbb/decorrelation")
+qsurf, pt_edges, rho_edges = load_qsurf(alpha = 0.995, mvar = "mX2p", qsurf_dir = "/eos/user/z/zima/MASS_DECORRELATION_EFFORTS/NoSmoothing/outputs") # OUTDIR of decorrelation/ScoutGloParT_decorrelation.py
 
 # del qsurf, pt_edges, rho_edges
 
@@ -556,7 +556,7 @@ if APPLY_Z_RECOIL_CORR:
     )
 
 for year in YEARS_COMBINED_DICT:
-    out_dir = Path(f"/eos/user/e/eheikkil/scouting/templates/{tag}/")
+    out_dir = Path(f"/eos/user/z/zima/scouting/templates/{tag}/")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     template_dir = out_dir

@@ -31,7 +31,7 @@ scouting_details = {
 
 details = scouting_details if SCOUTING else offline_details
 
-SKIMMER_DIR = "/eos/user/e/eheikkil/bbbb/skimmer"
+SKIMMER_DIR = "/eos/user/z/zima/bbbb/skimmer"
 YEARS = ["2023", "2023BPix"]
 TAG = (
     "14Feb2026_VJets_TT_Only_v15_scouting_zbb"
@@ -40,7 +40,7 @@ TAG = (
 )
 YEAR_DIRS = [f"{SKIMMER_DIR}/{TAG}/{YEAR}" for YEAR in YEARS]
 
-SAVE_TO = "/eos/user/e/eheikkil/DATA_SPECTRA"
+SAVE_TO = "/eos/user/z/zima/DATA_SPECTRA"
 RESULTS_DIR = f"{SAVE_TO}/results"
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
