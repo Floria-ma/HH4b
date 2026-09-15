@@ -141,6 +141,7 @@ class bbbbSkimmer(SkimmerABC):
             **P4, 
             "msoftdrop": "Msd",
             "particleNet_mass": "PNetMass",
+            #"ScoutParTmassCorrResonance": "ScoutParTmassCorrResonance",
         },
         "GenHiggs": P4,
         "Event": {
@@ -777,6 +778,7 @@ class bbbbSkimmer(SkimmerABC):
             "ScoutParTmassGeneric",
             "ScoutParTmassCorrectedX2p",
             "ScoutParTmassCorrectedW2p",
+            "ScoutParTmassCorrResonance",
             # "ScoutParTmassCorrFactorX2p",
             # "ScoutParTmassCorrFactorW2p",
             ]
