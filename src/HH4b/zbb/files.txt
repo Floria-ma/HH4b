@@ -1,0 +1,10 @@
+/eos/user/b/bribeiro/HadronicVH/treesScouting_Sep24HJ_2024_had/data/parts/ScoutingPFRun3_tree_0.root ScoutingPFRun3_tree_0.root
+/eos/user/b/bribeiro/HadronicVH/treesScouting_Sep24HJ_2024_had/data/parts/ScoutingPFRun3_tree_1.root ScoutingPFRun3_tree_1.root
+/eos/user/b/bribeiro/HadronicVH/treesScouting_Sep24HJ_2024_had/data/parts/ScoutingPFRun3_tree_2.root ScoutingPFRun3_tree_2.root
+/eos/user/b/bribeiro/HadronicVH/treesScouting_Sep24HJ_2024_had/data/parts/ScoutingPFRun3_tree_3.root ScoutingPFRun3_tree_3.root
+/eos/user/b/bribeiro/HadronicVH/treesScouting_Sep24HJ_2024_had/data/parts/ScoutingPFRun3_tree_4.root ScoutingPFRun3_tree_4.root
+/eos/user/b/bribeiro/HadronicVH/treesScouting_Sep24HJ_2024_had/data/parts/ScoutingPFRun3_tree_5.root ScoutingPFRun3_tree_5.root
+/eos/user/b/bribeiro/HadronicVH/treesScouting_Sep24HJ_2024_had/data/parts/ScoutingPFRun3_tree_6.root ScoutingPFRun3_tree_6.root
+/eos/user/b/bribeiro/HadronicVH/treesScouting_Sep24HJ_2024_had/data/parts/ScoutingPFRun3_tree_7.root ScoutingPFRun3_tree_7.root
+/eos/user/b/bribeiro/HadronicVH/treesScouting_Sep24HJ_2024_had/data/parts/ScoutingPFRun3_tree_8.root ScoutingPFRun3_tree_8.root
+/eos/user/b/bribeiro/HadronicVH/treesScouting_Sep24HJ_2024_had/data/parts/ScoutingPFRun3_tree_9.root ScoutingPFRun3_tree_9.root

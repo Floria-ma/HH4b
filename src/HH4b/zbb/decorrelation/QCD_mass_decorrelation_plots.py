@@ -10,6 +10,7 @@ import pickle
 from tqdm import tqdm
 import mplhep as hep
 import matplotlib.ticker as mticker
+from HH4b.zbb import nanotrees_loader
 
 plt.style.use(hep.style.CMS)
 hep.style.use("CMS")
@@ -21,7 +22,9 @@ mpl.rcParams.update({
     "legend.fontsize": 25,
 })
 
-SCOUTING: bool = False
+# Input ntuples: "nanotrees" reads the VH NanoTrees "had" trees in NANOTREES_DIR,
+# "scouting" / "offline" the bbbbSkimmer outputs in SKIMMER_DIR
+INPUT = "nanotrees"
 
 offline_details = {
     "model": "GloParT-v3",
@@ -29,6 +32,8 @@ offline_details = {
     #"mass_var": "bbFatJetMsd0", # This will be a good check (granted QCD is trained to target M_SD so not sure how good, might be better for data check)
     "mass_var": "bbFatJetParT3massGeneric0",
     "txbb_var": "bbFatJetParT3TXbb0",
+    "mass_label": r"$m_{\mathrm{generic}}$ [GeV]",
+    "year": "2023",
     "filename_suffix": "offline"
 }
 
@@ -38,18 +43,48 @@ scouting_details = {
     "mass_var": "bbFatJetMsd0",
     #"mass_var": "bbFatJetScoutParTmassGeneric0",
     "txbb_var": "bbFatJetScoutParTTXbb0",
+    "mass_label": r"$m_{\mathrm{SD}}$ [GeV]",
+    "year": "2023",
     "filename_suffix": "scouting"
 }
 
-details = scouting_details if SCOUTING else offline_details
+# nanotrees_loader columns of the highest-TXbb jet: ak8_ParT_resonanceMass and ak8_ParT_HbbVsQCD
+nanotrees_details = {
+    "model": "Scouting GloParT (24)",
+    "mass_var": "bbFatJetScoutParTmassCorrResonance",
+    "txbb_var": "bbFatJetScoutParTTXbb",
+    "mass_label": r"$m_{\mathrm{res}}$ [GeV]",
+    "year": "2024",
+    "filename_suffix": "nanotrees"
+}
+
+details = {"offline": offline_details, "scouting": scouting_details, "nanotrees": nanotrees_details}[INPUT]
 
 filename_suffix = details["filename_suffix"]
 mass_variable = details["mass_var"]
 
 SKIMMER_DIR = "/eos/user/z/zima/bbbb/skimmer"
 YEARS = ["2023BPix", "2023"]
-TAG = "13Feb2026_Data_Standard_Cuts_QCD_Inclusive_v15_scouting_zbb" if SCOUTING else "06Feb2025_QCD_Offline_Inclusive_PTl_300_etaS_HT_1k_v15_scouting_zbb"
+TAG = "13Feb2026_Data_Standard_Cuts_QCD_Inclusive_v15_scouting_zbb" if INPUT == "scouting" else "06Feb2025_QCD_Offline_Inclusive_PTl_300_etaS_HT_1k_v15_scouting_zbb"
 YEAR_DIR = [f"{SKIMMER_DIR}/{TAG}/{YEAR}" for YEAR in YEARS]
+
+#NANOTREES_DIR = "/eos/user/b/bribeiro/HadronicVH/treesScouting_Jun2_2024_had"
+#NANOTREES_DIR = "/eos/user/z/zima/private_production/vhcc/test_2024_had"
+NANOTREES_DIR = "/eos/user/z/zima/HadronicVH/tagger_Cali_2024_had"
+#NANOTREES_DIR = "/eos/user/b/bribeiro/HadronicVH/treesScouting_Sep24_2024_had/"
+# QCD files relative to NANOTREES_DIR (None: nanotrees_loader.SAMPLE_FILES, the merged mc/qcd*_tree.root).
+# The merge of this production stopped at qcd1 (HT 100-800), so read the HT-binned parts, here slimmed by
+# skim_nanotrees.py to the branches nanotrees_loader reads (all events kept). The originals are in mc/parts
+NANOTREES_QCD_FILES = "mc/skim/qcd*_tree.root"
+# Lowest TXbb region, also replacing the TXbb > 0.3 cut of nanotrees_loader.DEFAULT_SELECTION (the scouting Zbb
+# selection of the templates). Reprocess after changing.
+# tagger_Cali_2024_had has no tagger preselection, so TXbb > 0.0 is inclusive. Productions run with
+# tagger_threshold_bb/cc = 0.3 (e.g. treesScouting_Jun2_2024_had) only keep events with an AK8 jet passing
+# HbbVsQCD > 0.3 or HccVsQCD > 0.3, so there below TXbb = 0.3 is only Hcc-tagged QCD
+NANOTREES_MIN_TXBB = 0.0
+# common selection of the VH had analysis (vh_had.py), i.e. no pT/HT cut but mass windows on both jets
+NANOTREES_SELECTION = {**nanotrees_loader.VH_HAD_SELECTION, "txbb_lead": NANOTREES_MIN_TXBB}
+
 REPROCESS = False
 
 SAVE_TO = "/eos/user/z/zima/QCD_SPECTRA"
@@ -69,6 +104,42 @@ def get_QCD_files(year_dirs: list[str] = YEAR_DIR) -> list[str]:
     return qcd_filelist
 
 
+def iterate_QCD(qcd_filelist: list = None, mass_variable: str = mass_variable):
+    """Yields (TXbb, pT, mass, weight) of the highest-TXbb jet in QCD, per skimmer file or NanoTrees chunk"""
+    if INPUT == "nanotrees":
+        chunks = nanotrees_loader.iterate_nanotrees(
+            NANOTREES_DIR, "QCD", selection=NANOTREES_SELECTION, file_pattern=NANOTREES_QCD_FILES
+        )
+        for _, chunk in tqdm(chunks, desc="Aggregating QCD TXbb regions", unit=" chunks"):
+            if chunk is None:
+                continue
+            yield (
+                chunk[details["txbb_var"]][:, 0],
+                chunk["bbFatJetPt"][:, 0],
+                chunk[mass_variable][:, 0],
+                chunk["weight"][:, 0],
+            )
+        return
+
+    if qcd_filelist is None:
+        qcd_filelist = get_QCD_files()
+
+    print(f"Processing {len(qcd_filelist)} QCD files...")
+
+    for file in tqdm(qcd_filelist, desc="Aggregating QCD TXbb regions"):
+        with uproot.open(file) as f:
+            if "Events" not in f:
+                continue
+
+            events = f["Events"]
+            yield (
+                events[details["txbb_var"]].array(library="np"),
+                events["bbFatJetPt0"].array(library="np"),
+                events[mass_variable].array(library="np"),
+                events["weight"].array(library="np"),
+            )
+
+
 def aggregate_QCD_TXbb_regions(
     txbb_regions: list = None,
     pt_regions: list = None,
@@ -81,10 +152,6 @@ def aggregate_QCD_TXbb_regions(
         raise Exception("TXbb regions not defined")
     if pt_regions is None:
         raise Exception("pT regions not defined")
-    if qcd_filelist is None:
-        qcd_filelist = get_QCD_files()
-
-    print(f"Processing {len(qcd_filelist)} QCD files...")
 
     pt_bins = np.array([pt[0] for pt in pt_regions] + [pt_regions[-1][1]])
     txbb_bins = np.linspace(0.0, 1.0, 101)  # 100 bins, did 400 in other
@@ -94,38 +161,28 @@ def aggregate_QCD_TXbb_regions(
     hist = np.zeros((len(pt_bins)-1, len(txbb_bins)-1, len(mass_bins)-1))
     hist_w2 = np.zeros_like(hist)
 
-    for file in tqdm(qcd_filelist, desc="Aggregating QCD TXbb regions"):
-        with uproot.open(file) as f:
-            if "Events" not in f:
-                continue
+    for txbb_values, pt_values, mass_values, weight_values in iterate_QCD(qcd_filelist, mass_variable):
+        mask = np.isfinite(txbb_values) & np.isfinite(pt_values) & np.isfinite(mass_values)
+        txbb_values = txbb_values[mask]
+        pt_values = pt_values[mask]
+        mass_values = mass_values[mask]
+        weight_values = weight_values[mask]
 
-            events = f["Events"]
-            txbb_values = events[details["txbb_var"]].array(library="np")
-            pt_values = events["bbFatJetPt0"].array(library="np")
-            mass_values = events[mass_variable].array(library="np")
-            weight_values = events["weight"].array(library="np")
+        i_pt = np.digitize(pt_values, pt_bins) - 1
+        j_txbb = np.digitize(txbb_values, txbb_bins) - 1
+        k_mass = np.digitize(mass_values, mass_bins) - 1
 
-            mask = np.isfinite(txbb_values) & np.isfinite(pt_values) & np.isfinite(mass_values)
-            txbb_values = txbb_values[mask]
-            pt_values = pt_values[mask]
-            mass_values = mass_values[mask]
-            weight_values = weight_values[mask]
+        valid = (i_pt >= 0) & (i_pt < len(pt_bins)-1) & \
+                (j_txbb >= 0) & (j_txbb < len(txbb_bins)-1) & \
+                (k_mass >= 0) & (k_mass < len(mass_bins)-1)
 
-            i_pt = np.digitize(pt_values, pt_bins) - 1
-            j_txbb = np.digitize(txbb_values, txbb_bins) - 1
-            k_mass = np.digitize(mass_values, mass_bins) - 1
+        i_pt_v = i_pt[valid]
+        j_txbb_v = j_txbb[valid]
+        k_mass_v = k_mass[valid]
+        w_v = weight_values[valid]
 
-            valid = (i_pt >= 0) & (i_pt < len(pt_bins)-1) & \
-                    (j_txbb >= 0) & (j_txbb < len(txbb_bins)-1) & \
-                    (k_mass >= 0) & (k_mass < len(mass_bins)-1)
-
-            i_pt_v = i_pt[valid]
-            j_txbb_v = j_txbb[valid]
-            k_mass_v = k_mass[valid]
-            w_v = weight_values[valid]
-
-            np.add.at(hist, (i_pt_v, j_txbb_v, k_mass_v), w_v)
-            np.add.at(hist_w2, (i_pt_v, j_txbb_v, k_mass_v), w_v**2)
+        np.add.at(hist, (i_pt_v, j_txbb_v, k_mass_v), w_v)
+        np.add.at(hist_w2, (i_pt_v, j_txbb_v, k_mass_v), w_v**2)
 
     return {
         "hist": hist,
@@ -379,11 +436,11 @@ def compare_shapes_in_pt_region(aggregate_dict, reference_key, pt_region=(300, 4
 
     ax2.axhline(y=1, color='black', linestyle='--', linewidth=2)
     ax2.set_ylim(1/3.0, 3.0)
-    ax2.set_xlabel(r'$m_{{\mathrm{{generic}}}}$ [GeV]')
+    ax2.set_xlabel(details["mass_label"])
     ax2.set_ylabel('Ratio')
     #ax2.grid(axis='y', linestyle='-', linewidth=1, which='both')
 
-    hep.cms.label(data=False, year="2023", ax=ax1, com="13.6")
+    hep.cms.label(data=False, year=details["year"], ax=ax1, com="13.6")
 
     return fig
 
@@ -410,32 +467,24 @@ def extract_inclusive_TXbb(hist_dict, normalize=True):
     return txbb_centers, txbb_hist, txbb_err
 
 def plot_TXbb_comparison(
-    scouting_hist_dict,
-    offline_hist_dict,
+    datasets,
     logy=True,
     normalize=True
 ):
+    """datasets: {model label: hist dict of aggregate_QCD_TXbb_regions}"""
     print("Plotting comparisons")
     fig, ax = plt.subplots(figsize=(10, 8))
 
-    datasets = {
-        "Scouting GloParT (22-23)": scouting_hist_dict,
-        "GloParT-v3": offline_hist_dict
-    }
+    colors = ["tab:blue", "tab:red", "tab:green"]
 
-    colors = {
-        "Scouting GloParT (22-23)": "tab:blue",
-        "GloParT-v3": "tab:red"
-    }
-
-    for label, hdict in datasets.items():
+    for color, (label, hdict) in zip(colors, datasets.items()):
         x, y, yerr = extract_inclusive_TXbb(hdict, normalize=normalize)
 
         ax.step(
             x, y,
             where="mid",
             linewidth=3,
-            color=colors[label],
+            color=color,
             label=label
         )
         ax.errorbar(
@@ -443,7 +492,7 @@ def plot_TXbb_comparison(
             yerr=yerr,
             fmt="none",
             linewidth=2,
-            color=colors[label]
+            color=color
         )
 
     ax.set_xlabel(r"$T_{\mathrm{Xbb}}$")
@@ -474,7 +523,7 @@ def plot_TXbb_comparison(
 
     hep.cms.label(
         data=False,
-        year="2023",
+        year=details["year"],
         ax=ax,
         com="13.6"
     )
@@ -510,7 +559,10 @@ def main():
         (0.98, 1.0),
         #(0.99, 1.0),
     ]
+    if INPUT == "nanotrees":
+        txbb_regions = [region for region in txbb_regions if region[0] >= NANOTREES_MIN_TXBB]
 
+    '''
     pt_regions = [
         (300, 450),
         (450, 550),
@@ -518,38 +570,61 @@ def main():
         # (300, 10000),
         # (450, 10000)
     ]
+    '''
+    pt_regions = [
+        (100, 500),
+        (500,1300 ), 
+        #(550, 10000)
+    ]
 
-    if REPROCESS or not os.path.isfile(SAVE_TO_FILE):
-        qcd_files = get_QCD_files()
+    # inputs of the saved hists: a saved file made with other ones is reprocessed instead of silently reused
+    if INPUT == "nanotrees":
+        inputs = {"dir": NANOTREES_DIR, "files": NANOTREES_QCD_FILES, "selection": NANOTREES_SELECTION}
+    else:
+        inputs = {"dirs": YEAR_DIR}
+    config = {"inputs": inputs, "mass_variable": mass_variable, "pt_regions": pt_regions,
+              "mass_range": (20, 200), "mass_bin_width": 12.0}
+
+    hist_dict = None
+    if not REPROCESS and os.path.isfile(SAVE_TO_FILE):
+        hist_dict = load_results(SAVE_TO_FILE)
+        if hist_dict.get("config") != config:
+            print(f"{SAVE_TO_FILE} was made with {hist_dict.get('config')}, reprocessing for {config}")
+            hist_dict = None
+
+    if hist_dict is None:
         hist_dict = aggregate_QCD_TXbb_regions(
             txbb_regions=txbb_regions,
             pt_regions=pt_regions,
-            qcd_filelist=qcd_files,
-            mass_range=(20, 200),
-            mass_bin_width=12.0,
+            mass_range=config["mass_range"],
+            mass_bin_width=config["mass_bin_width"],
             mass_variable=details["mass_var"]
         )
+        hist_dict["config"] = config
         save_results(hist_dict)
     else:
-        hist_dict = load_results(SAVE_TO_FILE)
+        # the 3D hist spans the full TXbb range, so the TXbb regions can change without reprocessing (unlike the pT ones)
+        hist_dict["txbb_regions"] = txbb_regions
 
     aggregate_dict = build_region_dict_from_3D(hist_dict)
 
-    if SCOUTING:
-        offline_hist_dict = load_results(f"{SAVE_TO}/saved_aggregate_dict_offline.pkl")
-        fig = plot_TXbb_comparison(
-            scouting_hist_dict = hist_dict,
-            offline_hist_dict = offline_hist_dict
-        )
-        fig.savefig(f"{RESULTS_DIR}/TXbb_full_distribution_comparison.pdf")
+    if INPUT == "scouting":
+        datasets = {
+            scouting_details["model"]: hist_dict,
+            offline_details["model"]: load_results(f"{SAVE_TO}/saved_aggregate_dict_offline.pkl"),
+        }
+        txbb_plot_name = "comparison"
+    elif INPUT == "offline":
+        datasets = {
+            scouting_details["model"]: load_results(f"{SAVE_TO}/saved_aggregate_dict_scouting_{mass_variable}.pkl"),
+            offline_details["model"]: hist_dict,
+        }
+        txbb_plot_name = "comparison"
     else:
-        mass_variable = details["mass_var"]
-        scouting_hist_dict = load_results(f"{SAVE_TO}/saved_aggregate_dict_scouting_{mass_variable}.pkl")
-        fig = plot_TXbb_comparison(
-            scouting_hist_dict = scouting_hist_dict,
-            offline_hist_dict = hist_dict
-        )
-        fig.savefig(f"{RESULTS_DIR}/TXbb_full_distribution_comparison.pdf")
+        datasets = {details["model"]: hist_dict}
+        txbb_plot_name = filename_suffix
+    fig = plot_TXbb_comparison(datasets)
+    fig.savefig(f"{RESULTS_DIR}/TXbb_full_distribution_{txbb_plot_name}.pdf")
 
     print("Region Summary:")
     for key, region_data in aggregate_dict.items():
@@ -562,8 +637,6 @@ def main():
             reference_key=f"TXbb = [{txbb_regions[0][0]}, {txbb_regions[0][1]}], pT = [{pt_region[0]}, {pt_region[1]}]",
             pt_region=pt_region
         )
-        filename_suffix = details["filename_suffix"]
-        mass_variable = details["mass_var"]
         fig.savefig(f"{RESULTS_DIR}/pT{pt_region[0]}to{pt_region[1]}_{filename_suffix}_{mass_variable}.pdf")
 
 

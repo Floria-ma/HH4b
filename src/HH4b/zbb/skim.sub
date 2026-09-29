@@ -1,0 +1,10 @@
+executable = skim.sh
+arguments = $(infile) $(outname)
+output = ./logs/$(outname).out
+error = ./logs/$(outname).err
+log = ./logs/skim.log
+request_cpus = 4
+request_memory = 8000
+request_disk = 30GB
++JobFlavour = "workday"
+queue infile, outname from ./files.txt

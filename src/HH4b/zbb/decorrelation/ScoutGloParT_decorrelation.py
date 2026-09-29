@@ -15,7 +15,7 @@ hep.style.use("CMS")
 REPROCESS = True
 
 SKIMMER_DIR = "/eos/user/z/zima/bbbb/skimmer"
-YEARS = ["2023", "2023BPix"]
+YEARS = ["2023", "2023BPix","2024"]
 TAG = "13Feb2026_Data_Standard_Cuts_QCD_Inclusive_v15_scouting_zbb"
 YEAR_DIRS = [f"{SKIMMER_DIR}/{TAG}/{y}" for y in YEARS]
 

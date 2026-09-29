@@ -21,28 +21,50 @@ from matplotlib.ticker import MaxNLocator
 from numpy.typing import ArrayLike
 from tqdm import tqdm
 
+from HH4b.zbb import nanotrees_loader
+
 plt.style.use(hep.style.CMS)
 hep.style.use("CMS")
 
-SCOUTING: bool = False
+# Input ntuples: "nanotrees" reads the VH NanoTrees "had" trees in NANOTREES_DIR,
+# "scouting" / "offline" the bbbbSkimmer outputs in SKIMMER_DIR
+INPUT = "nanotrees"
 BLIND_REGION = (100, 150)
 
 offline_details = {
     "model": "GloParT-v3",
     "mass_var": "bbFatJetParT3massGeneric0", #"bbFatJetMsd0", #"bbFatJetParT3massGeneric0", #"bbFatJetParT3massCorrectedX2p0",
     "txbb_var": "bbFatJetParT3TXbb0",
+    "mass_label": r"$m_{\mathrm{generic}}$ [GeV]",
+    "data_label": "Offline JetMET Data",
+    "year": "2023",
+    "lumi": 28,
 }
 
 scouting_details = {
     "model": "Scouting GloParT (22-23)",
     "mass_var": "bbFatJetMsd0", #"bbFatJetScoutParTmassGeneric0", #"bbFatJetScoutParTmassCorrectedX2p0",
     "txbb_var": "bbFatJetScoutParTTXbb0",
+    "mass_label": r"$m_{\mathrm{SD}}$ [GeV]",
+    "data_label": "Scouting Data",
+    "year": "2023",
+    "lumi": 28,
 }
 
-if SCOUTING:
-    details = scouting_details
-else:
-    details = offline_details
+# nanotrees_loader columns of the highest-TXbb jet: ak8_ParT_resonanceMass and ak8_ParT_HbbVsQCD
+nanotrees_details = {
+    "model": "Scouting GloParT (24)",
+    "mass_var": "bbFatJetScoutParTmassCorrResonance",
+    "txbb_var": "bbFatJetScoutParTTXbb",
+    "mass_label": r"$m_{\mathrm{res}}$ [GeV]",
+    "data_label": "Scouting Data (Run2024D)",
+    "year": "2024",
+    "lumi": None,  # only the part of Run2024D that NANOTREES_DATA_FILES covers
+}
+
+details = {"offline": offline_details, "scouting": scouting_details, "nanotrees": nanotrees_details}[INPUT]
+filename_suffix = INPUT
+mass_variable = details["mass_var"]
 
 formatter = mticker.ScalarFormatter(useMathText=True)
 formatter.set_powerlimits((-3, 3))
@@ -56,12 +78,24 @@ mpl.rcParams["figure.edgecolor"] = "none"
 
 SKIMMER_DIR = "/eos/user/z/zima/bbbb/skimmer"
 YEARS = ["2023", "2023BPix"]
-TAG =  "07Feb2026_PTl450TXbb0p3_PTsl200_HT1000_v15_scouting_zbb" if not SCOUTING else "14Feb2026_VJets_TT_Only_v15_scouting_zbb"
+TAG =  "07Feb2026_PTl450TXbb0p3_PTsl200_HT1000_v15_scouting_zbb" if INPUT != "scouting" else "14Feb2026_VJets_TT_Only_v15_scouting_zbb"
 YEAR_DIRS = [f"{SKIMMER_DIR}/{TAG}/{YEAR}" for YEAR in YEARS]
-REPROCESS = True
+
+NANOTREES_DIR = "/eos/user/z/zima/HadronicVH/tagger_Cali_2024_had"
+# Data files relative to NANOTREES_DIR (None: nanotrees_loader.SAMPLE_FILES, i.e. data/parts). The merge of this
+# production has not run, so read the per-job pieces: job ids 191-416, all Run2024D (the Run2024C jobs produced none),
+# here slimmed by skim_nanotrees.py to the branches nanotrees_loader reads (all events kept). The originals are in data/pieces
+NANOTREES_DATA_FILES = "data/skim/*/*.root"
+# Lowest TXbb region, also replacing the TXbb > 0.3 cut of nanotrees_loader.DEFAULT_SELECTION (the scouting Zbb
+# selection of the templates). tagger_Cali_2024_had has no tagger preselection, so TXbb > 0.0 is inclusive
+NANOTREES_MIN_TXBB = 0.0
+# common selection of the VH had analysis (vh_had.py), i.e. no pT/HT cut but mass windows on both jets
+NANOTREES_SELECTION = {**nanotrees_loader.VH_HAD_SELECTION, "txbb_lead": NANOTREES_MIN_TXBB}
+
+REPROCESS = False
 
 SAVE_TO = "/eos/user/z/zima/DATA_SPECTRA"
-SAVE_TO_FILE = f"{SAVE_TO}/saved_aggregate_dict.pkl"
+SAVE_TO_FILE = f"{SAVE_TO}/saved_aggregate_dict_{filename_suffix}_{mass_variable}.pkl"
 RESULTS_DIR = f"{SAVE_TO}/results"
 os.makedirs(RESULTS_DIR, exist_ok = True)
 
@@ -114,6 +148,49 @@ def get_DATA_files(year_dirs: list(str) = YEAR_DIRS) -> list:
     print(f"Length of DATA filelist: {len(data_filelist)}")
     return data_filelist
 
+def iterate_DATA(data_filelist: list = None, mass_variable: str = None):
+    """Yields (TXbb, pT, mass) of the highest-TXbb jet in data, per skimmer file or NanoTrees chunk"""
+    if mass_variable is None:
+        mass_variable = details["mass_var"]
+
+    if INPUT == "nanotrees":
+        chunks = nanotrees_loader.iterate_nanotrees(
+            NANOTREES_DIR, "data", selection=NANOTREES_SELECTION, file_pattern=NANOTREES_DATA_FILES
+        )
+        for _, chunk in tqdm(chunks, desc="Aggregating DATA TXbb regions", unit=" chunks"):
+            if chunk is None:
+                continue
+            yield (
+                chunk[details["txbb_var"]][:, 0],
+                chunk["bbFatJetPt"][:, 0],
+                chunk[mass_variable][:, 0],
+            )
+        return
+
+    if data_filelist is None:
+        data_filelist = get_DATA_files()
+
+    print(f"Processing {len(data_filelist)} DATA files...")
+
+    for i, file in enumerate(data_filelist):
+        if i % 10 == 0:
+            print(f"Processing file {i+1}/{len(data_filelist)}: {os.path.basename(file)}")
+        try:
+            with uproot.open(file) as f:
+                if "Events" not in f:
+                    print(f"Warning: No 'Events' tree in {file}")
+                    continue
+                events = f["Events"]
+                yield (
+                    events[details["txbb_var"]].array().to_numpy(),
+                    events["bbFatJetPt0"].array().to_numpy(),
+                    events[mass_variable].array().to_numpy(),
+                )
+        except Exception as e:
+            print(f"Error processing {file}: {e}")
+            continue
+
+
 def aggregate_DATA_TXbb_regions(
     txbb_regions: list = None,
     pt_regions: list = None,
@@ -151,11 +228,6 @@ def aggregate_DATA_TXbb_regions(
     if pt_regions is None:
         raise Exception("pT regions not defined")
     
-    if data_filelist is None:
-        data_filelist = get_DATA_files()
-    
-    print(f"Processing {len(data_filelist)} DATA files...")
-    
     n_bins = int((mass_range[1] - mass_range[0]) / mass_bin_width)
     mass_bins = np.linspace(mass_range[0], mass_range[1], n_bins + 1)
     
@@ -172,49 +244,24 @@ def aggregate_DATA_TXbb_regions(
                 'total_events': 0
             }
     
-    for i, file in enumerate(data_filelist):
-        if i % 10 == 0:
-            print(f"Processing file {i+1}/{len(data_filelist)}: {os.path.basename(file)}")
-        
-        try:
-            with uproot.open(file) as f:
-                if "Events" not in f:
-                    print(f"Warning: No 'Events' tree in {file}")
-                    continue
-                    
-                events = f["Events"]
-                
-                try:
-                    txbb_values = events[details["txbb_var"]].array().to_numpy()
-                    pt_values = events["bbFatJetPt0"].array().to_numpy()
-                    mass_values = events[mass_variable].array().to_numpy()
+    for txbb_values, pt_values, mass_values in iterate_DATA(data_filelist, mass_variable):
+        for txbb_region in txbb_regions:
+            txbb_mask = (txbb_values >= txbb_region[0]) & (txbb_values < txbb_region[1])
 
-                except KeyError as e:
-                    print(f"Warning: Missing variable {e} in {file}")
-                    continue
-                
-                for txbb_region in txbb_regions:
-                    txbb_mask = (txbb_values >= txbb_region[0]) & (txbb_values < txbb_region[1])
-                    
-                    for pt_region in pt_regions:
-                        pt_mask = (pt_values >= pt_region[0]) & (pt_values < pt_region[1])
-                        
-                        combined_mask = txbb_mask & pt_mask
-                        
-                        if combined_mask.any():
-                            selected_masses = mass_values[combined_mask]
-                            
-                            hist, _ = np.histogram(selected_masses, bins=mass_bins)
-                            
-                            key = f"TXbb = [{txbb_region[0]}, {txbb_region[1]}], pT = [{pt_region[0]}, {pt_region[1]}]"
-                            # key = f"txbb_{txbb_region[0]}_{txbb_region[1]}_pt_{pt_region[0]}_{pt_region[1]}"
-                            aggregate_dictionary[key]['hist'] += hist
-                            aggregate_dictionary[key]['total_events'] += len(selected_masses)
-                            
-        except Exception as e:
-            print(f"Error processing {file}: {e}")
-            continue
-    
+            for pt_region in pt_regions:
+                pt_mask = (pt_values >= pt_region[0]) & (pt_values < pt_region[1])
+
+                combined_mask = txbb_mask & pt_mask
+
+                if combined_mask.any():
+                    selected_masses = mass_values[combined_mask]
+
+                    hist, _ = np.histogram(selected_masses, bins=mass_bins)
+
+                    key = f"TXbb = [{txbb_region[0]}, {txbb_region[1]}], pT = [{pt_region[0]}, {pt_region[1]}]"
+                    aggregate_dictionary[key]['hist'] += hist
+                    aggregate_dictionary[key]['total_events'] += len(selected_masses)
+
     return aggregate_dictionary
 
 def normalize_histograms(
@@ -348,7 +395,7 @@ def compare_shapes_in_pt_region(
 
     model = details["model"]
     plot_text_lines = [
-        "Offline JetMET Data",
+        details["data_label"],
         f"Model: {model}",
         rf"$p_T \in ({pt_region[0]}, {pt_region[1]})$",
         r"$T_{{\mathrm{{Xbb}}}} = \frac{P(X \to b\bar{b})}{P(X \to b\bar{b}) + P(\text{QCD})}$"
@@ -436,7 +483,7 @@ def compare_shapes_in_pt_region(
     ax2.axhline(y=1, color='black', linestyle='--', linewidth=2)
     ax2.set_ylim((0.5, 2.0))
     
-    ax2.set_xlabel(r'$m_{{\mathrm{{generic}}}}$ [GeV]')
+    ax2.set_xlabel(details["mass_label"])
     ax2.set_ylabel(f'Ratio')
     
     # ax2.grid(axis='y', linestyle='-', linewidth=2, which='both')
@@ -457,16 +504,16 @@ def compare_shapes_in_pt_region(
         hep.cms.label(
             "Internal",
             data=True,
-            year="2023",
+            year=details["year"],
             ax=ax1,
             com="13.6",
-            lumi=28
+            lumi=details["lumi"]
         )
     
     return fig
 
 
-def save_results(aggregate_dict, out_file="/eos/user/z/zima/DATA_SPECTRA/saved_aggregate_dict.pkl"):
+def save_results(aggregate_dict, out_file=SAVE_TO_FILE):
     """Save histograms and summary to files"""
     
     with open(out_file, 'wb') as f:
@@ -547,11 +594,8 @@ def compute_decorrelated_efficiency_weighted(files, qsurf, bins):
 
 
 def main():
-    if REPROCESS or not os.path.isfile(SAVE_TO_FILE):
-        data_files = get_DATA_files()
-        print(f"Found {len(data_files)} DATA files")
-    
     txbb_regions = [
+        (0.0, 1.0),
         (0.3, 1.0),
         (0.6, 1.0),
         #(0.7, 1.0),
@@ -565,42 +609,56 @@ def main():
         (0.98, 1.0),
         #(0.99, 1.0)
     ]
-    
+    # the skimmer ntuples have a TXbb > 0.3 preselection, so there the lowest region is 0.3
+    min_txbb = NANOTREES_MIN_TXBB if INPUT == "nanotrees" else 0.3
+    txbb_regions = [region for region in txbb_regions if region[0] >= min_txbb]
+
+    # VHcc analysis low/high pT regions
     pt_regions = [
-        (300, 450),
-        (450, 550), 
-        (550, 10000)
+        (100, 500),
+        (500,1300 ), 
+        #(550, 10000)
     ]
-    
-    if REPROCESS or not os.path.isfile(SAVE_TO_FILE):
+
+    # inputs of the saved hists: a saved file made with other ones is reprocessed instead of silently reused
+    if INPUT == "nanotrees":
+        inputs = {"dir": NANOTREES_DIR, "files": NANOTREES_DATA_FILES, "selection": NANOTREES_SELECTION}
+    else:
+        inputs = {"dirs": YEAR_DIRS}
+    config = {"inputs": inputs, "mass_variable": mass_variable, "txbb_regions": txbb_regions,
+              "pt_regions": pt_regions, "mass_range": (20, 200), "mass_bin_width": 5.0}
+
+    aggregate_dict = None
+    if not REPROCESS and os.path.isfile(SAVE_TO_FILE):
+        saved = load_results(SAVE_TO_FILE)
+        if saved.get("config") != config:
+            print(f"{SAVE_TO_FILE} was made with {saved.get('config')}, reprocessing for {config}")
+        else:
+            aggregate_dict = saved["regions"]
+
+    if aggregate_dict is None:
         print("Aggregating DATA events by region...")
         aggregate_dict = aggregate_DATA_TXbb_regions(
             txbb_regions=txbb_regions,
             pt_regions=pt_regions,
-            data_filelist=data_files,
-            mass_range=(20, 200),
-            mass_bin_width=5.0,
-            mass_variable = details["mass_var"]
+            mass_range=config["mass_range"],
+            mass_bin_width=config["mass_bin_width"],
+            mass_variable=mass_variable,
         )
-        save_results(aggregate_dict)
-    else:
-        print(f"Loading aggregated dictionary from {SAVE_TO_FILE}")
-        aggregate_dict = load_results(SAVE_TO_FILE)
+        save_results({"config": config, "regions": aggregate_dict})
 
-    
     print("Region Summary:")
     for key, region_data in aggregate_dict.items():
         print(f"{key}: {region_data['total_events']} events")
     
     print("Creating plots...")
-    mass_variable_name = details["mass_var"]
     for pt_region in pt_regions:
         fig = compare_shapes_in_pt_region(
             aggregate_dict, 
             reference_key = f"TXbb = [{txbb_regions[0][0]}, {txbb_regions[0][1]}], pT = [{pt_region[0]}, {pt_region[1]}]",
             pt_region = pt_region
             )
-        fig.savefig(f"{RESULTS_DIR}/pT{pt_region[0]}to{pt_region[1]}_{mass_variable_name}.pdf")
+        fig.savefig(f"{RESULTS_DIR}/pT{pt_region[0]}to{pt_region[1]}_{filename_suffix}_{mass_variable}.pdf")
 
 if __name__ == "__main__":
     main()

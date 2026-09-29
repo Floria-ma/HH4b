@@ -10,7 +10,18 @@ import correctionlib
 from collections import OrderedDict
 import uproot
 
+import nanotrees_loader
+
+# Input ntuples: "skimmer" reads the bbbbSkimmer parquet in DATA_DIR, "nanotrees" the VH NanoTrees "had" trees in NANOTREES_DIR
+INPUT_FORMAT = "nanotrees"
+NANOTREES_DIR = "/eos/user/z/zima/private_production/vhcc/test_2024_had"
+# Luminosity (fb^-1) to normalise the NanoTrees MC to. None keeps the full-2024 lumiwgt of the trees,
+# so set this to the lumi of the data eras in NANOTREES_DIR (test_2024_had has Run2024C+D only)
+NANOTREES_MC_LUMI = None
+
 tag = "14Feb2026_VJets_TT_Only_v15_scouting_zbb" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
+if INPUT_FORMAT == "nanotrees":
+    tag = f"nanotrees_{Path(NANOTREES_DIR).name}"
 
 # Pass and fail regions
 txbb_bins = [0.96, 1.0]
@@ -37,26 +48,31 @@ APPLY_Z_RECOIL_CORR: bool = True
 DO_JESR: bool = False # can't
 DO_JMSR: bool = True
 tagger_branch = "bbFatJetScoutParTTXbb"
+# Regressed mass to fit. The NanoTrees only have the resonance mass, skimmer outputs also "bbFatJetScoutParTmassCorrectedX2p"
+MASS_VAR = "bbFatJetScoutParTmassCorrResonance"
+MASS_LABEL = r"$m_\mathrm{res}$ (GeV)"
 
 
 YEARS = [
-    # "2022", 
-    # "2022EE", 
-     "2023", 
-    "2023BPix",
-    #"2024"
+    # "2022",
+    # "2022EE",
+    # "2023",
+    # "2023BPix",
+    "2024"
     ]
 YEARS_COMBINED_DICT = {
     # "2022All": [
-    #         "2022", 
+    #         "2022",
     #         "2022EE"
     #         ],
-     "2023All": [
-             "2023", 
-            "2023BPix"
-             ],
-    #"2024": ["2024"]
+    # "2023All": [
+    #         "2023",
+    #         "2023BPix"
+    #         ],
+    "2024All": ["2024"]
 }
+# ZMuMu GenZPt correction applied to each combined year. None has been derived for 2024 yet, so 2024 reuses 2023
+Z_RECOIL_CORR_YEAR = {"2022All": "2022", "2023All": "2023", "2024All": "2023"}
 RUNS = {
     "2023": ["Run2023C"],
     "2023BPix": ["Run2023D"],
@@ -116,8 +132,7 @@ mass_vars = [
     "bbFatJetMsd",
 ]
 scoutpart_mass_vars = [
-    "bbFatJetScoutParTmassCorrectedX2p",
-    "bbFatJetScoutParTmassGeneric"
+    MASS_VAR,
 ]
 
 scoutpart_txbbb_vars = [
@@ -226,16 +241,24 @@ else:
                 print(f"Loading {sample} for {year}...")
 
                 columns = base_columns + extra_columns_dict.get(sample, [])
-                dataframes = {
-                    **utils.load_samples(
-                        data_dir=str(DATA_DIR),
-                        samples={sample: sample_list},
-                        year=year,
-                        columns=utils.format_columns(columns),
-                        variations=True,
-                        weight_shifts=weight_shifts,
+                if INPUT_FORMAT == "nanotrees":
+                    dataframes = nanotrees_loader.load_nanotrees(
+                        NANOTREES_DIR,
+                        [sample],
+                        jmsr_vars=mass_vars if DO_JMSR else [],
+                        mc_lumi=NANOTREES_MC_LUMI,
                     )
-                }
+                else:
+                    dataframes = {
+                        **utils.load_samples(
+                            data_dir=str(DATA_DIR),
+                            samples={sample: sample_list},
+                            year=year,
+                            columns=utils.format_columns(columns),
+                            variations=True,
+                            weight_shifts=weight_shifts,
+                        )
+                    }
 
                 # Process and concatenate dataframes for this sample
                 sample_dfs = []
@@ -331,7 +354,7 @@ if APPLY_Z_RECOIL_CORR:
     print("Applying Zto2Q corrections...")
     for year in YEARS_COMBINED_DICT.keys():
         # apply corrections to the events
-        corr = corr_dict[year.replace("All", "")]["GenZPtWeight"]
+        corr = corr_dict[Z_RECOIL_CORR_YEAR[year]]["GenZPtWeight"]
         GenZ_pt = events_combined[year]["Zto2Q"]["GenZPt"].values[:, 0]
         sf_nom = corr.evaluate(GenZ_pt, "nominal")
         sf_up = corr.evaluate(GenZ_pt, "stat_up")
@@ -491,6 +514,21 @@ for year in YEARS_COMBINED_DICT:
     template_dir = out_dir
     template_dir.mkdir(parents=True, exist_ok=True)
 
+    events = events_combined[year]
+
+    # smear once per year: it modifies the nominal mass in place, so inside the pT bin loop it compounded per bin
+    for sample_name, df in events.items():
+        if sample_name != "data":
+            print(sample_name)
+            apply_jmsr_smearing_in_templates(
+                    df,
+                    mass_branch_base=MASS_VAR,
+                    jet_index=0,
+                    seed=42,
+                    jms_vals=(0.9, 1.0, 1.1), # these are in nonsensical order right now, change to work with dict
+                    jmr_vals=(1.1, 1.0, 1.2)
+                )
+
     for pt_low, pt_high in pt_bins:
         pt_low_str = str(pt_low)
         pt_high_str = str(pt_high)
@@ -504,41 +542,14 @@ for year in YEARS_COMBINED_DICT:
 
         templates = {}
 
-        events = events_combined[year]
-
-        for sample_name, df in events.items():
-            if sample_name != "data":
-                print(sample_name)
-                apply_jmsr_smearing_in_templates(
-                        df,
-                        mass_branch_base= "bbFatJetScoutParTmassCorrectedX2p", #"bbFatJetParT3massCorrectedX2p",
-                        jet_index=0,
-                        seed=42,
-                        jms_vals=(0.9, 1.0, 1.1), # these are in nonsensical order right now, change to work with dict
-                        jmr_vals=(1.1, 1.0, 1.2)
-                    )
-
         # Determine the pt and mass variations
         for jshift in jshift_keys:
             pt_branch = "bbFatJetPt0"
-            mass_branch = "bbFatJetScoutParTmassCorrectedX2p0"
-            #mass_branch = "bbFatJetScoutParTmassGeneric0"
-            #mass_branch = "bbFatJetMsd0"
-            if jshift == "":
-                pt_branch = "bbFatJetPt0"
-                mass_branch = "bbFatJetScoutParTmassCorrectedX2p0"
-                # mass_branch = "bbFatJetScoutParTmassGeneric0"
-                #mass_branch = "bbFatJetMsd0"
-            elif jshift.startswith("JES") or jshift.startswith("JER"):
+            mass_branch = f"{MASS_VAR}0"
+            if jshift.startswith("JES") or jshift.startswith("JER"):
                 pt_branch = f"bbFatJetPt_{jshift}0"
-                mass_branch = "bbFatJetScoutParTmassCorrectedX2p0"
-                # mass_branch = "bbFatJetScoutParTmassGeneric0"
-                #mass_branch = "bbFatJetMsd0"
             elif jshift.startswith("JMS") or jshift.startswith("JMR"):
-                pt_branch = "bbFatJetPt0"
-                mass_branch = f"bbFatJetScoutParTmassCorrectedX2p_{jshift}0"
-                # mass_branch = f"bbFatJetScoutParTmassGeneric_{jshift}0"
-                #mass_branch = f"bbFatJetMsd_{jshift}0"
+                mass_branch = f"{MASS_VAR}_{jshift}0"
             # Different pass regions based on TXbb and pT bins
             selection_regions = {}
             for txbb_low, txbb_high in txbb_bins:
@@ -579,7 +590,7 @@ for year in YEARS_COMBINED_DICT:
 
             fit_shape_var = postprocessing.ShapeVar(
                 mass_branch,
-                r"$m_\mathrm{X2p}$ (GeV)",
+                MASS_LABEL,
                 [n_mass_bins, m_low, m_high],
                 reg=True,
             )
