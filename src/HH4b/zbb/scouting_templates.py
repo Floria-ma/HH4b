@@ -14,26 +14,35 @@ import nanotrees_loader
 
 # Input ntuples: "skimmer" reads the bbbbSkimmer parquet in DATA_DIR, "nanotrees" the VH NanoTrees "had" trees in NANOTREES_DIR
 INPUT_FORMAT = "nanotrees"
-NANOTREES_DIR = "/eos/user/z/zima/private_production/vhcc/test_2024_had"
+NANOTREES_DIR = "/eos/user/z/zima/HadronicVH/tagger_Cali_2024_had"
 # Luminosity (fb^-1) to normalise the NanoTrees MC to. None keeps the full-2024 lumiwgt of the trees,
 # so set this to the lumi of the data eras in NANOTREES_DIR (test_2024_had has Run2024C+D only)
 NANOTREES_MC_LUMI = None
+# Files of each sample relative to NANOTREES_DIR, overriding nanotrees_loader.SAMPLE_FILES. tagger_Cali_2024_had
+# has no merged trees, only the skim_nanotrees.py skims (as in QCD/Data_mass_decorrelation_plots.py)
+NANOTREES_FILES = {
+    "data": "data/skim/*/ScoutingPFRun3_tree_*.root",
+    "Zto2Q": "mc/skim/z2qq_tree.root",
+    "Wto2Q": "mc/skim/w2qq_tree.root",
+    "ttbar": "mc/skim/ttbar_tree.root",
+    "QCD": "mc/skim/qcd*_tree.root",
+}
 
 tag = "14Feb2026_VJets_TT_Only_v15_scouting_zbb" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
 if INPUT_FORMAT == "nanotrees":
     tag = f"nanotrees_{Path(NANOTREES_DIR).name}"
 
 # Pass and fail regions
-txbb_bins = [0.96, 1.0]
+txbb_bins = [0.75, 0.93, 1.0]
 min_txbb = txbb_bins[0]
 # pT bins
-pt_bins = [350, 450, 550, 1800]
+pt_bins = [170, 250, 300, 350, 500, 1300]
 
 txbb_bins = list(zip(txbb_bins[:-1], txbb_bins[1:]))
 pt_bins = list(zip(pt_bins[:-1], pt_bins[1:]))
 
 # Mass bins
-m_low, m_high = 40, 180
+m_low, m_high = 30, 200
 bin_width = 5
 n_mass_bins = int((m_high - m_low) / bin_width)
 
@@ -44,7 +53,7 @@ PROCESSED_DIR = STORAGE_PROJ_DIR / f"scouting/templates/{tag}"
 PROCESSED_DIR.mkdir(exist_ok=True, parents=True)
 
 REPROCESS: bool = True  # if True, reprocess from the skimmed ntuples
-APPLY_Z_RECOIL_CORR: bool = True
+APPLY_Z_RECOIL_CORR: bool = False # if True, apply the Z->2Q recoil corrections derived from ZMuMu measurement
 DO_JESR: bool = False # can't
 DO_JMSR: bool = True
 tagger_branch = "bbFatJetScoutParTTXbb"
@@ -245,8 +254,10 @@ else:
                     dataframes = nanotrees_loader.load_nanotrees(
                         NANOTREES_DIR,
                         [sample],
+                        selection=nanotrees_loader.VH_HAD_SELECTION,
                         jmsr_vars=mass_vars if DO_JMSR else [],
                         mc_lumi=NANOTREES_MC_LUMI,
+                        file_patterns=NANOTREES_FILES,
                     )
                 else:
                     dataframes = {
@@ -582,7 +593,7 @@ for year in YEARS_COMBINED_DICT:
                 cuts={
                     pt_branch: [pt_low, pt_high],
                     mass_branch: [m_low, m_high],
-                    f"{tagger_branch}0": [0.3, min(0.9, min_txbb)], # Having tagger score selection at 0.9 leaks Zbb to fail
+                    f"{tagger_branch}0": [0.0, min(0.9, min_txbb)], # Having tagger score selection at 0.9 leaks Zbb to fail
                 },
                 label="fail",
             )
