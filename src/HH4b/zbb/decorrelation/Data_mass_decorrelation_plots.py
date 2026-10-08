@@ -11,6 +11,7 @@ import pickle
 
 import math
 from collections import OrderedDict
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from copy import deepcopy
 from pathlib import Path
 
@@ -57,9 +58,9 @@ nanotrees_details = {
     "mass_var": "bbFatJetScoutParTmassCorrResonance",
     "txbb_var": "bbFatJetScoutParTTXbb",
     "mass_label": r"$m_{\mathrm{res}}$ [GeV]",
-    "data_label": "Scouting Data (Run2024D)",
+    "data_label": "Scouting Data (Run2024 CD+HJ)",
     "year": "2024",
-    "lumi": None,  # only the part of Run2024D that NANOTREES_DATA_FILES covers
+    "lumi": None,  # only the eras that NANOTREES_DATA_FILES covers
 }
 
 details = {"offline": offline_details, "scouting": scouting_details, "nanotrees": nanotrees_details}[INPUT]
@@ -85,7 +86,7 @@ NANOTREES_DIR = "/eos/user/z/zima/HadronicVH/tagger_Cali_2024_had"
 # Data files relative to NANOTREES_DIR (None: nanotrees_loader.SAMPLE_FILES, i.e. data/parts). The merge of this
 # production has not run, so read the per-job pieces: job ids 191-416, all Run2024D (the Run2024C jobs produced none),
 # here slimmed by skim_nanotrees.py to the branches nanotrees_loader reads (all events kept). The originals are in data/pieces
-NANOTREES_DATA_FILES = "data/skim/*/*.root"
+NANOTREES_DATA_FILES = "data/skim/*/ScoutingPFRun3_tree_*.root"
 # Lowest TXbb region, also replacing the TXbb > 0.3 cut of nanotrees_loader.DEFAULT_SELECTION (the scouting Zbb
 # selection of the templates). tagger_Cali_2024_had has no tagger preselection, so TXbb > 0.0 is inclusive
 NANOTREES_MIN_TXBB = 0.0
@@ -93,6 +94,8 @@ NANOTREES_MIN_TXBB = 0.0
 NANOTREES_SELECTION = {**nanotrees_loader.VH_HAD_SELECTION, "txbb_lead": NANOTREES_MIN_TXBB}
 
 REPROCESS = False
+# parallel processes reading the data files (each holds a ~500 MB chunk of branches, a few GB at its peak)
+N_WORKERS = 6
 
 SAVE_TO = "/eos/user/z/zima/DATA_SPECTRA"
 SAVE_TO_FILE = f"{SAVE_TO}/saved_aggregate_dict_{filename_suffix}_{mass_variable}.pkl"
@@ -148,16 +151,24 @@ def get_DATA_files(year_dirs: list(str) = YEAR_DIRS) -> list:
     print(f"Length of DATA filelist: {len(data_filelist)}")
     return data_filelist
 
-def iterate_DATA(data_filelist: list = None, mass_variable: str = None):
-    """Yields (TXbb, pT, mass) of the highest-TXbb jet in data, per skimmer file or NanoTrees chunk"""
-    if mass_variable is None:
-        mass_variable = details["mass_var"]
+def get_NANOTREES_DATA_files() -> list:
+    """NanoTrees data files, largest first so that the parallel workers finish at about the same time"""
+    files = sorted(Path(NANOTREES_DIR).glob(NANOTREES_DATA_FILES), key=lambda f: f.stat().st_size, reverse=True)
+    print(f"Length of DATA filelist: {len(files)}")
+    return files
 
+
+def iterate_DATA_file(file, mass_variable: str):
+    """Yields (TXbb, pT, mass) of the highest-TXbb jet in a data skimmer file, or per chunk of a NanoTrees file"""
     if INPUT == "nanotrees":
         chunks = nanotrees_loader.iterate_nanotrees(
-            NANOTREES_DIR, "data", selection=NANOTREES_SELECTION, file_pattern=NANOTREES_DATA_FILES
+            NANOTREES_DIR,
+            "data",
+            selection=NANOTREES_SELECTION,
+            file_pattern=str(Path(file).relative_to(NANOTREES_DIR)),
+            jet_columns=[details["txbb_var"], "bbFatJetPt", mass_variable],
         )
-        for _, chunk in tqdm(chunks, desc="Aggregating DATA TXbb regions", unit=" chunks"):
+        for _, chunk in chunks:
             if chunk is None:
                 continue
             yield (
@@ -167,28 +178,42 @@ def iterate_DATA(data_filelist: list = None, mass_variable: str = None):
             )
         return
 
-    if data_filelist is None:
-        data_filelist = get_DATA_files()
+    try:
+        with uproot.open(file) as f:
+            if "Events" not in f:
+                print(f"Warning: No 'Events' tree in {file}")
+                return
+            events = f["Events"]
+            yield (
+                events[details["txbb_var"]].array().to_numpy(),
+                events["bbFatJetPt0"].array().to_numpy(),
+                events[mass_variable].array().to_numpy(),
+            )
+    except Exception as e:
+        print(f"Error processing {file}: {e}")
 
-    print(f"Processing {len(data_filelist)} DATA files...")
 
-    for i, file in enumerate(data_filelist):
-        if i % 10 == 0:
-            print(f"Processing file {i+1}/{len(data_filelist)}: {os.path.basename(file)}")
-        try:
-            with uproot.open(file) as f:
-                if "Events" not in f:
-                    print(f"Warning: No 'Events' tree in {file}")
-                    continue
-                events = f["Events"]
-                yield (
-                    events[details["txbb_var"]].array().to_numpy(),
-                    events["bbFatJetPt0"].array().to_numpy(),
-                    events[mass_variable].array().to_numpy(),
-                )
-        except Exception as e:
-            print(f"Error processing {file}: {e}")
-            continue
+def histogram_DATA_file(file, txbb_regions: list, pt_regions: list, mass_bins: np.ndarray, mass_variable: str):
+    """Mass histograms [TXbb region, pT region, mass bin] and event counts [TXbb region, pT region] of a data file"""
+    n_bins = len(mass_bins) - 1
+    hists = np.zeros((len(txbb_regions), len(pt_regions), n_bins))
+    totals = np.zeros((len(txbb_regions), len(pt_regions)), dtype=np.int64)
+
+    for txbb_values, pt_values, mass_values in iterate_DATA_file(file, mass_variable):
+        # mass bin of each event, binned as np.histogram (last bin closed, out of range or NaN dropped)
+        mass_bin = np.searchsorted(mass_bins, mass_values, side="right") - 1
+        mass_bin[mass_values == mass_bins[-1]] = n_bins - 1
+        in_range = (mass_bin >= 0) & (mass_bin < n_bins)
+
+        pt_masks = [(pt_values >= pt_min) & (pt_values < pt_max) for pt_min, pt_max in pt_regions]
+        for i, (txbb_min, txbb_max) in enumerate(txbb_regions):
+            txbb_mask = (txbb_values >= txbb_min) & (txbb_values < txbb_max)
+            for j, pt_mask in enumerate(pt_masks):
+                combined_mask = txbb_mask & pt_mask
+                hists[i, j] += np.bincount(mass_bin[combined_mask & in_range], minlength=n_bins)
+                totals[i, j] += np.count_nonzero(combined_mask)
+
+    return hists, totals
 
 
 def aggregate_DATA_TXbb_regions(
@@ -244,23 +269,22 @@ def aggregate_DATA_TXbb_regions(
                 'total_events': 0
             }
     
-    for txbb_values, pt_values, mass_values in iterate_DATA(data_filelist, mass_variable):
-        for txbb_region in txbb_regions:
-            txbb_mask = (txbb_values >= txbb_region[0]) & (txbb_values < txbb_region[1])
+    if data_filelist is None:
+        data_filelist = get_NANOTREES_DATA_files() if INPUT == "nanotrees" else get_DATA_files()
 
-            for pt_region in pt_regions:
-                pt_mask = (pt_values >= pt_region[0]) & (pt_values < pt_region[1])
-
-                combined_mask = txbb_mask & pt_mask
-
-                if combined_mask.any():
-                    selected_masses = mass_values[combined_mask]
-
-                    hist, _ = np.histogram(selected_masses, bins=mass_bins)
-
+    # the files are read in parallel: reading them is the slow part
+    with ProcessPoolExecutor(min(N_WORKERS, len(data_filelist))) as pool:
+        futures = [
+            pool.submit(histogram_DATA_file, file, txbb_regions, pt_regions, mass_bins, mass_variable)
+            for file in data_filelist
+        ]
+        for future in tqdm(as_completed(futures), total=len(futures), desc="Aggregating DATA TXbb regions", unit=" files"):
+            hists, totals = future.result()
+            for i, txbb_region in enumerate(txbb_regions):
+                for j, pt_region in enumerate(pt_regions):
                     key = f"TXbb = [{txbb_region[0]}, {txbb_region[1]}], pT = [{pt_region[0]}, {pt_region[1]}]"
-                    aggregate_dictionary[key]['hist'] += hist
-                    aggregate_dictionary[key]['total_events'] += len(selected_masses)
+                    aggregate_dictionary[key]['hist'] += hists[i, j]
+                    aggregate_dictionary[key]['total_events'] += int(totals[i, j])
 
     return aggregate_dictionary
 
@@ -339,7 +363,10 @@ def compare_shapes_in_pt_region(
     ax1 = axes[0]
     ax2 = axes[1]
     
-    colors = plt.cm.rainbow(np.linspace(0, 1, len(normalized_dict)))
+    # One color per TXbb region, so the same TXbb range has the same color in every pT plot
+    txbb_labels = list(dict.fromkeys(k.split(", pT")[0] for k in normalized_dict))
+    txbb_cmap = plt.cm.rainbow(np.linspace(0, 1, len(txbb_labels)))
+    colors = {k: txbb_cmap[txbb_labels.index(k.split(", pT")[0])] for k in normalized_dict}
     
     for i, (key, region_data) in enumerate(normalized_dict.items()):
         if f"pT = [{pt_region[0]}, {pt_region[1]}]" not in key:
@@ -349,7 +376,11 @@ def compare_shapes_in_pt_region(
         bin_edges = bins
         bin_centers = (bins[:-1] + bins[1:]) / 2
         
-        label = fr"$T_{{\mathrm{{Xbb}}}} > {region_data['txbb_region'][0]}$"
+        txbb_min, txbb_max = region_data['txbb_region']
+        if txbb_max >= 1.0:
+            label = fr"$T_{{\mathrm{{Xbb}}}} > {txbb_min}$"
+        else:
+            label = fr"${txbb_min} \leq T_{{\mathrm{{Xbb}}}} < {txbb_max}$"
         
         orig_hist = aggregate_dict[key]['hist']
         
@@ -369,12 +400,12 @@ def compare_shapes_in_pt_region(
         scaled_errors[~blind_mask] = np.nan
         
         ax1.step(bin_centers, region_data['hist'], where='mid', 
-                color=colors[i], linewidth=2, label=label)
+                color=colors[key], linewidth=3, label=label)
         
         ax1.errorbar(bin_centers, region_data['hist'], 
                     yerr=scaled_errors, 
                     fmt='none',  
-                    color=colors[i], 
+                    color=colors[key], 
                     # alpha=0.5,  
                     # capsize=3,  
                     # capthick=1,
@@ -469,12 +500,12 @@ def compare_shapes_in_pt_region(
             ratio_errors = np.zeros_like(region_data['hist'])
         
         ax2.step(bin_centers, ratio, where='mid', 
-                color=colors[i], linewidth=2)
+                color=colors[key], linewidth=3)
         
         ax2.errorbar(bin_centers, ratio, 
                     yerr=ratio_errors, 
                     fmt='none',
-                    color=colors[i], 
+                    color=colors[key], 
                     # alpha=0.5,
                     # capsize=3,
                     # capthick=1,
@@ -594,6 +625,7 @@ def compute_decorrelated_efficiency_weighted(files, qsurf, bins):
 
 
 def main():
+    '''
     txbb_regions = [
         (0.0, 1.0),
         (0.3, 1.0),
@@ -609,16 +641,55 @@ def main():
         (0.98, 1.0),
         #(0.99, 1.0)
     ]
+    '''
+    # VHcc analysis TXbb regions
+    txbb_regions = [
+        (0.0, 1.0),
+        #(0.3, 1.0),
+        # (0.4, 1.0),
+        (0.4, 0.8),
+        (0.8, 0.9),
+        (0.9, 1.0),
+        # (0.92, 1.0),
+        #(0.94, 1.0),
+        #(0.96, 1.0),
+        #(0.98, 1.0),
+        #(0.99, 1.0),
+    ]
+    
     # the skimmer ntuples have a TXbb > 0.3 preselection, so there the lowest region is 0.3
     min_txbb = NANOTREES_MIN_TXBB if INPUT == "nanotrees" else 0.3
     txbb_regions = [region for region in txbb_regions if region[0] >= min_txbb]
 
-    # VHcc analysis low/high pT regions
+    # VHcc analysis low/high pT regions, now check more granular pT regions
     pt_regions = [
-        (100, 500),
-        (500,1300 ), 
-        #(550, 10000)
+        (170,200),
+        (200, 225),
+        (225, 250),
+        (250,275),
+        (275, 300),
+        (300,325),
+        (325, 350),
+        (350, 375),
+        (350,400),
+        (375, 400),
+        (400, 500),
+        (500,1300 ),
+        # (170, 275),
+        # (275,300),
+        # (300,325),
+        # (275, 325),
+        # (325, 375),
+        # (375, 500),
+        # (500, 1300)
     ]
+
+    # oringinal scouting Zbb analysis pT regions
+    #pt_regions = [
+    #    (300, 450),
+    #    (450,550 ), 
+    #    (550, 10000)
+    #]
 
     # inputs of the saved hists: a saved file made with other ones is reprocessed instead of silently reused
     if INPUT == "nanotrees":
@@ -655,7 +726,7 @@ def main():
     for pt_region in pt_regions:
         fig = compare_shapes_in_pt_region(
             aggregate_dict, 
-            reference_key = f"TXbb = [{txbb_regions[0][0]}, {txbb_regions[0][1]}], pT = [{pt_region[0]}, {pt_region[1]}]",
+            reference_key = f"TXbb = [{txbb_regions[1][0]}, {txbb_regions[1][1]}], pT = [{pt_region[0]}, {pt_region[1]}]",
             pt_region = pt_region
             )
         fig.savefig(f"{RESULTS_DIR}/pT{pt_region[0]}to{pt_region[1]}_{filename_suffix}_{mass_variable}.pdf")

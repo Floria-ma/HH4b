@@ -72,18 +72,16 @@ YEAR_DIR = [f"{SKIMMER_DIR}/{TAG}/{YEAR}" for YEAR in YEARS]
 #NANOTREES_DIR = "/eos/user/z/zima/private_production/vhcc/test_2024_had"
 NANOTREES_DIR = "/eos/user/z/zima/HadronicVH/tagger_Cali_2024_had"
 #NANOTREES_DIR = "/eos/user/b/bribeiro/HadronicVH/treesScouting_Sep24_2024_had/"
-# QCD files relative to NANOTREES_DIR (None: nanotrees_loader.SAMPLE_FILES, the merged mc/qcd*_tree.root).
-# The merge of this production stopped at qcd1 (HT 100-800), so read the HT-binned parts, here slimmed by
-# skim_nanotrees.py to the branches nanotrees_loader reads (all events kept). The originals are in mc/parts
+# QCD files relative to NANOTREES_DIR: the merged qcd1-5 of treesScouting_Sep24_2024_had, slimmed by
+# skim_nanotrees.py to the branches nanotrees_loader reads (all events kept). The originals are in
+# /eos/user/b/bribeiro/HadronicVH/treesScouting_Sep24_2024_had/mc
 NANOTREES_QCD_FILES = "mc/skim/qcd*_tree.root"
-# Lowest TXbb region, also replacing the TXbb > 0.3 cut of nanotrees_loader.DEFAULT_SELECTION (the scouting Zbb
-# selection of the templates). Reprocess after changing.
-# tagger_Cali_2024_had has no tagger preselection, so TXbb > 0.0 is inclusive. Productions run with
-# tagger_threshold_bb/cc = 0.3 (e.g. treesScouting_Jun2_2024_had) only keep events with an AK8 jet passing
-# HbbVsQCD > 0.3 or HccVsQCD > 0.3, so there below TXbb = 0.3 is only Hcc-tagged QCD
+
 NANOTREES_MIN_TXBB = 0.0
 # common selection of the VH had analysis (vh_had.py), i.e. no pT/HT cut but mass windows on both jets
 NANOTREES_SELECTION = {**nanotrees_loader.VH_HAD_SELECTION, "txbb_lead": NANOTREES_MIN_TXBB}
+# drop QCD events with xsecWeight * genWeight above this (low-stat HT bins with huge weights), None to keep all
+NANOTREES_MAX_QCD_WEIGHT = 1.0
 
 REPROCESS = False
 
@@ -113,11 +111,14 @@ def iterate_QCD(qcd_filelist: list = None, mass_variable: str = mass_variable):
         for _, chunk in tqdm(chunks, desc="Aggregating QCD TXbb regions", unit=" chunks"):
             if chunk is None:
                 continue
+            keep = slice(None)
+            if NANOTREES_MAX_QCD_WEIGHT is not None:
+                keep = chunk["xsecGenWeight"][:, 0] <= NANOTREES_MAX_QCD_WEIGHT
             yield (
-                chunk[details["txbb_var"]][:, 0],
-                chunk["bbFatJetPt"][:, 0],
-                chunk[mass_variable][:, 0],
-                chunk["weight"][:, 0],
+                chunk[details["txbb_var"]][keep, 0],
+                chunk["bbFatJetPt"][keep, 0],
+                chunk[mass_variable][keep, 0],
+                chunk["weight"][keep, 0],
             )
         return
 
@@ -361,8 +362,13 @@ def compare_shapes_in_pt_region(aggregate_dict, reference_key, pt_region=(300, 4
         hist = region_data['hist']
         errors = region_data['hist_errors']
 
-        txbb_min = region_data['txbb_region'][0]
-        label = fr"$T_{{\mathrm{{Xbb}}}} > {txbb_min}$" if txbb_min != 0.0 else fr"$Inclusive$"
+        txbb_min, txbb_max = region_data['txbb_region']
+        if txbb_min == 0.0 and txbb_max >= 1.0:
+            label = fr"$Inclusive$"
+        elif txbb_max >= 1.0:
+            label = fr"$T_{{\mathrm{{Xbb}}}} > {txbb_min}$"
+        else:
+            label = fr"${txbb_min} \leq T_{{\mathrm{{Xbb}}}} < {txbb_max}$"
 
         ax1.step(
             bin_centers, hist,
@@ -435,7 +441,7 @@ def compare_shapes_in_pt_region(aggregate_dict, reference_key, pt_region=(300, 4
         )
 
     ax2.axhline(y=1, color='black', linestyle='--', linewidth=2)
-    ax2.set_ylim(1/3.0, 3.0)
+    ax2.set_ylim(1/3.0, 2.0)
     ax2.set_xlabel(details["mass_label"])
     ax2.set_ylabel('Ratio')
     #ax2.grid(axis='y', linestyle='-', linewidth=1, which='both')
@@ -532,8 +538,6 @@ def plot_TXbb_comparison(
 
 
 
-
-
 def save_results(aggregate_dict, out_file=SAVE_TO_FILE):
     with open(out_file, 'wb') as f:
         pickle.dump(aggregate_dict, f, protocol=pickle.HIGHEST_PROTOCOL)
@@ -546,6 +550,7 @@ def load_results(in_file):
 
 
 def main():
+    '''
     txbb_regions = [
         (0.0, 1.0),
         (0.3, 1.0),
@@ -557,6 +562,20 @@ def main():
         (0.94, 1.0),
         (0.96, 1.0),
         (0.98, 1.0),
+        #(0.99, 1.0),
+    ]
+    '''
+    txbb_regions = [
+        (0.0, 1.0),
+        #(0.3, 1.0),
+        # (0.4, 1.0),
+        (0.4, 0.8),
+        (0.8, 0.9),
+        (0.9, 1.0),
+        # (0.92, 1.0),
+        #(0.94, 1.0),
+        #(0.96, 1.0),
+        #(0.98, 1.0),
         #(0.99, 1.0),
     ]
     if INPUT == "nanotrees":
@@ -571,15 +590,44 @@ def main():
         # (450, 10000)
     ]
     '''
+
     pt_regions = [
-        (100, 500),
-        (500,1300 ), 
-        #(550, 10000)
+        # 170-220 don't have any stats, and 220-300, 300-400 still have bad correlation issue
+        # try different binnings
+        # now 170-350 more problematic
+        #(170, 250),
+        (170,200),
+        (170,500),
+        (200, 225),
+        (225, 250),
+        (250,275),
+        (275, 300),
+        (300,325),
+        (325, 350),
+        (350, 375),
+        (350,400),
+        (375, 400),
+        (400, 500),
+        (500,1300),
+        # (170, 275),
+        # (275,300),
+        # (300,325),
+        # (275, 325),
+        # (325, 375),
+        # (375, 500),
+        # (500, 1300)
     ]
+
+    #pt_regions = [
+    #    (300, 450),
+    #    (450,550 ), 
+    #    (550, 10000)
+    #]
 
     # inputs of the saved hists: a saved file made with other ones is reprocessed instead of silently reused
     if INPUT == "nanotrees":
-        inputs = {"dir": NANOTREES_DIR, "files": NANOTREES_QCD_FILES, "selection": NANOTREES_SELECTION}
+        inputs = {"dir": NANOTREES_DIR, "files": NANOTREES_QCD_FILES, "selection": NANOTREES_SELECTION,
+                  "max_qcd_weight": NANOTREES_MAX_QCD_WEIGHT}
     else:
         inputs = {"dirs": YEAR_DIR}
     config = {"inputs": inputs, "mass_variable": mass_variable, "pt_regions": pt_regions,
@@ -634,7 +682,7 @@ def main():
     for pt_region in pt_regions:
         fig = compare_shapes_in_pt_region(
             aggregate_dict,
-            reference_key=f"TXbb = [{txbb_regions[0][0]}, {txbb_regions[0][1]}], pT = [{pt_region[0]}, {pt_region[1]}]",
+            reference_key=f"TXbb = [{txbb_regions[1][0]}, {txbb_regions[1][1]}], pT = [{pt_region[0]}, {pt_region[1]}]",
             pt_region=pt_region
         )
         fig.savefig(f"{RESULTS_DIR}/pT{pt_region[0]}to{pt_region[1]}_{filename_suffix}_{mass_variable}.pdf")

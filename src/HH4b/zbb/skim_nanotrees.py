@@ -18,14 +18,21 @@ EXTRA_BRANCHES = ["ak8_ParT_HccVsQCD", "ak8_2_ParT_HccVsQCD"]
 
 LCG_VIEW = "/cvmfs/sft.cern.ch/lcg/views/LCG_110/x86_64-el9-gcc14-opt/setup.sh"
 
-def skim_branches(sample: str) -> list[str]:
-    branches = nanotrees_loader.read_branches(sample) + EXTRA_BRANCHES
+def skim_branches(sample: str, extra_branches: list[str] = ()) -> list[str]:
+    branches = nanotrees_loader.read_branches(sample) + EXTRA_BRANCHES + list(extra_branches)
     if sample != "data":
         branches.append("nPSWeight")  # counter of PSWeight and PSWeightNorm
     return list(dict.fromkeys(branches))
 
 
-def skim(sample: str, in_file: str, out_file: str, nthreads: int = 1, max_entries: int | None = None):
+def skim(
+    sample: str,
+    in_file: str,
+    out_file: str,
+    nthreads: int = 1,
+    max_entries: int | None = None,
+    extra_branches: list[str] = (),
+):
     import ROOT
 
     if nthreads > 1 and max_entries is None:  # RDataFrame.Range does not work with implicit MT
@@ -44,7 +51,7 @@ def skim(sample: str, in_file: str, out_file: str, nthreads: int = 1, max_entrie
     opts.fCompressionAlgorithm = ROOT.RCompressionSetting.EAlgorithm.kLZ4  # as the NanoTrees, fast to read
     opts.fCompressionLevel = 4
 
-    branches = skim_branches(sample)
+    branches = skim_branches(sample, extra_branches)
     out = df.Snapshot("Events", out_file, branches, opts)
     n_out = out.Count().GetValue()
     if n_out != n_expected:
@@ -52,7 +59,15 @@ def skim(sample: str, in_file: str, out_file: str, nthreads: int = 1, max_entrie
     print(f"Wrote {n_out} events with {len(branches)} branches to {out_file}")
 
 
-def submit(sample: str, nanotrees_dir: str, file_pattern: str, outdir: str, jobdir: str, nthreads: int):
+def submit(
+    sample: str,
+    nanotrees_dir: str,
+    file_pattern: str,
+    outdir: str,
+    jobdir: str,
+    nthreads: int,
+    extra_branches: list[str] = (),
+):
     files = sorted(Path(nanotrees_dir).glob(file_pattern))
     if not files:
         raise FileNotFoundError(f"No files in {nanotrees_dir}/{file_pattern}")
@@ -62,13 +77,14 @@ def submit(sample: str, nanotrees_dir: str, file_pattern: str, outdir: str, jobd
     os.makedirs(outdir, exist_ok=True)
 
     src_dir = Path(__file__).resolve().parents[2]
+    extra_arg = f' --extra-branches "{",".join(extra_branches)}"' if extra_branches else ""
     script = jobdir / "skim.sh"
     script.write_text(
         f"""#!/bin/bash
 set -e
 source {LCG_VIEW}
 export PYTHONPATH={src_dir}:$PYTHONPATH
-python {Path(__file__).resolve()} --sample {sample} --input "$1" --output skim.root --nthreads {nthreads}
+python {Path(__file__).resolve()} --sample {sample} --input "$1" --output skim.root --nthreads {nthreads}{extra_arg}
 xrdcp -f skim.root "{nanotrees_loader.xrootd_url(outdir)}/$2"
 rm skim.root
 """
@@ -106,12 +122,21 @@ def main():
     parser.add_argument("--file-pattern", help="glob relative to --nanotrees-dir")
     parser.add_argument("--outdir", help="EOS directory for the skimmed files (condor)")
     parser.add_argument("--jobdir", help="AFS directory for the condor files and logs")
+    parser.add_argument(
+        "--extra-branches",
+        default="",
+        help="comma separated branches to keep on top of the ones nanotrees_loader reads",
+    )
     args = parser.parse_args()
 
+    extra = [b for b in args.extra_branches.split(",") if b]
+
     if args.submit:
-        submit(args.sample, args.nanotrees_dir, args.file_pattern, args.outdir, args.jobdir, args.nthreads)
+        submit(
+            args.sample, args.nanotrees_dir, args.file_pattern, args.outdir, args.jobdir, args.nthreads, extra
+        )
     else:
-        skim(args.sample, args.input, args.output, args.nthreads, args.max_entries)
+        skim(args.sample, args.input, args.output, args.nthreads, args.max_entries, extra)
 
 
 if __name__ == "__main__":

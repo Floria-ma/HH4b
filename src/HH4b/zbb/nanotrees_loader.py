@@ -4,7 +4,6 @@
 # bbFatJets in the original skimmer, and the scouting Zbb selection of bbbbSkimmer is applied on top of the NanoTrees
 # "had" preselection (>= 2 AK8 jets, pT > 200 / 170, |dphi| > 2.2, MET < 150, no leptons, golden JSON).
 
-
 from __future__ import annotations
 
 import warnings
@@ -19,14 +18,14 @@ from HH4b.hh_vars import jmsr_shifts
 
 # NanoTrees output files of each template sample, relative to the NanoTrees output directory
 SAMPLE_FILES = {
-    "data": "data/parts/*.root",
-    "Zto2Q": "mc/z2qq_tree.root",
-    "Wto2Q": "mc/w2qq_tree.root",
-    "ttbar": "mc/ttbar_tree.root",
-    "QCD": "mc/qcd*_tree.root",  # HT-binned, merged into qcd1-5 (mc/parts has the unmerged low-HT bins, don't add)
+    "data": "data/skim/parts*/*.root",
+    "Zto2Q": "mc/skim/z2qq_tree.root",
+    "Wto2Q": "mc/skim/w2qq_tree.root",
+    "ttbar": "mc/skim/ttbar_tree.root",
+    "QCD": "mc/skim/qcd*_tree.root",  # HT-binned, merged into qcd1-5 (mc/parts has the unmerged low-HT bins, don't add)
 }
 
-# skimmer bbFatJet column: (leading-pT jet branch, subleading-pT jet branch)
+# skimmer bbFatJet column, to match the naming convention
 JET_BRANCHES = {
     "bbFatJetPt": ("ak8_pt", "ak8_2_pt"),
     "bbFatJetEta": ("ak8_eta", "ak8_2_eta"),
@@ -36,6 +35,8 @@ JET_BRANCHES = {
     "bbFatJetScoutParTTXbb": ("ak8_ParT_HbbVsQCD", "ak8_2_ParT_HbbVsQCD"),  # Xbb / (Xbb + QCD)
     "bbFatJetScoutParTmassCorrResonance": ("ak8_ParT_resonanceMass", "ak8_2_ParT_resonanceMass"),
 }
+# bbFatJet columns the selection uses, always read
+SELECTION_JET_COLUMNS = ["bbFatJetPt", "bbFatJetScoutParTTXbb", "bbFatJetMsd", "bbFatJetScoutParTmassCorrResonance"]
 
 # skimmer gen column: NanoTrees branch. "dr_vdaus" is the max dR(jet, V daughter) of each jet, used for bbFatJetVQQMatch
 GEN_BRANCHES = {
@@ -65,7 +66,7 @@ MC_WEIGHT_BRANCHES = [
     "trigSF",
 ]
 
-# scouting Zbb selection of bbbbSkimmer. The cuts below it are off by default (None), see VH_HAD_SELECTION
+# scouting Zbb selection of bbbbSkimmer. The cuts below it are off by default (None)
 DEFAULT_SELECTION = {
     "pt_lead": 300,  # highest-TXbb jet
     "txbb_lead": 0.3,  # highest-TXbb jet
@@ -79,13 +80,6 @@ DEFAULT_SELECTION = {
     "msd_mreg_shift": 10.0,
 }
 
-# common_selections of the VH(bb/cc) hadronic analysis:
-# PlotTools/VH/cards/rDataframeScripts/vh_had.py. Its cuts are the same for the H and the V jet, so they do
-# not need the Hidx assignment of the analysis (H: the jet of the H/V pairing with the larger
-# H_ParT_HVsQCD * V_ParT_VVsQCD) and are applied to both jets here.
-# Left out: met < 150, already applied to the had channel by the NanoTrees producer (the trees have met < 150
-# throughout), so that the selection also runs on skims without the met branch.
-# The analysis applies no pT or HT cut in its common selection (its categories cut on H_pt at 500 GeV)
 VH_HAD_SELECTION = {
     "pt_lead": 0,
     "txbb_lead": 0.0,
@@ -110,7 +104,8 @@ def _jet_pair(arrays, branches: tuple[str, str]) -> np.ndarray:
 
 
 def _ps_weights(arrays) -> np.ndarray:
-    """Normalised PS weights as [ISR up, FSR up, ISR down, FSR down], 1 for events without the 4 weights"""
+    # Normalised PS weights as [ISR up, FSR up, ISR down, FSR down], 1 for events without the 4 weights
+    # the same as the original skimmer's
     ps = arrays["PSWeight"] * arrays["PSWeightNorm"]
     has_4 = ak.to_numpy(ak.num(ps) == 4)
     ps = ak.to_numpy(ak.fill_none(ak.pad_none(ps, 4, clip=True), 1.0))
@@ -118,21 +113,31 @@ def _ps_weights(arrays) -> np.ndarray:
 
 
 def _select_chunk(
-    arrays, cuts: dict, is_data: bool, gen: dict, mc_lumi: float | None, apply_trig_sf: bool
+    arrays,
+    cuts: dict,
+    is_data: bool,
+    gen: dict,
+    mc_lumi: float | None,
+    apply_trig_sf: bool,
+    jet_columns: list[str] | None = None,
 ) -> dict[str, np.ndarray] | None:
     """Reorders the jets by TXbb, applies the selection and returns the skimmer-style columns of the passing events"""
-    jets = {col: _jet_pair(arrays, branches) for col, branches in JET_BRANCHES.items()}
+    # (leading-pT jet, subleading-pT jet) values. The cuts are on both jets or on the highest-TXbb one, so only
+    # the passing events are reordered (the reorder of every event dominated the run time on large data chunks)
+    jets = {col: (_to_np(arrays, b0), _to_np(arrays, b1)) for col, (b0, b1) in _jet_branches(jet_columns).items()}
 
-    # order the two jets by TXbb like the bbFatJets in the skimmer
-    order = np.argsort(jets["bbFatJetScoutParTTXbb"], axis=1)[:, ::-1]
-    jets = {col: np.take_along_axis(vals, order, axis=1) for col, vals in jets.items()}
+    # order the two jets by TXbb like the bbFatJets in the skimmer. Same as a descending argsort,
+    # i.e. the subleading-pT jet first on ties or if its TXbb is NaN
+    txbb0, txbb1 = jets["bbFatJetScoutParTTXbb"]
+    swap = np.isnan(txbb1) | (txbb1 >= txbb0)
 
-    pt = jets["bbFatJetPt"]
+    pt0, pt1 = jets["bbFatJetPt"]
     sel = (
         _to_np(arrays, "passTrigPFHTScouting")
-        & (pt[:, 0] >= cuts["pt_lead"])
-        & (jets["bbFatJetScoutParTTXbb"][:, 0] >= cuts["txbb_lead"])
-        & np.all(pt >= cuts["pt_subl"], axis=1)
+        & (np.where(swap, pt1, pt0) >= cuts["pt_lead"])
+        & (np.where(swap, txbb1, txbb0) >= cuts["txbb_lead"])
+        & (pt0 >= cuts["pt_subl"])
+        & (pt1 >= cuts["pt_subl"])
         & (_to_np(arrays, "dphi_ak8_ak8") >= cuts["dphi"])
         & (_to_np(arrays, "ht") >= cuts["ht"])
     )
@@ -141,28 +146,34 @@ def _select_chunk(
     msd = jets["bbFatJetMsd"]
     if cuts.get("met") is not None:
         sel = sel & (_to_np(arrays, "met") < cuts["met"])
-    if cuts.get("mreg") is not None:
-        sel = sel & np.all((mreg > cuts["mreg"][0]) & (mreg < cuts["mreg"][1]), axis=1)
-    if cuts.get("msd") is not None:
-        sel = sel & np.all((msd > cuts["msd"][0]) & (msd < cuts["msd"][1]), axis=1)
-    if cuts.get("msd_mreg_ratio") is not None:
-        shifted = msd + cuts["msd_mreg_shift"]
-        sel = sel & np.all(
-            (shifted > cuts["msd_mreg_ratio"][0] * mreg) & (shifted < cuts["msd_mreg_ratio"][1] * mreg),
-            axis=1,
-        )
+    for jet in (0, 1):
+        if cuts.get("mreg") is not None:
+            sel = sel & (mreg[jet] > cuts["mreg"][0]) & (mreg[jet] < cuts["mreg"][1])
+        if cuts.get("msd") is not None:
+            sel = sel & (msd[jet] > cuts["msd"][0]) & (msd[jet] < cuts["msd"][1])
+        if cuts.get("msd_mreg_ratio") is not None:
+            shifted = msd[jet] + cuts["msd_mreg_shift"]
+            sel = (
+                sel
+                & (shifted > cuts["msd_mreg_ratio"][0] * mreg[jet])
+                & (shifted < cuts["msd_mreg_ratio"][1] * mreg[jet])
+            )
 
     if not np.any(sel):
         return None
 
-    out = {col: vals[sel] for col, vals in jets.items()}
+    swap = swap[sel]
+    order = np.where(swap[:, None], [[1, 0]], [[0, 1]])
+    out = {}
+    for col, (vals0, vals1) in jets.items():
+        vals0, vals1 = vals0[sel], vals1[sel]
+        out[col] = np.stack([np.where(swap, vals1, vals0), np.where(swap, vals0, vals1)], axis=1)
 
     if is_data:
         out["weight"] = np.ones((np.sum(sel), 1))
         return out
 
     arrays = arrays[sel]
-    order = order[sel]
 
     lumi = mc_lumi if mc_lumi is not None else _to_np(arrays, "lumiwgt")
     base = _to_np(arrays, "xsecWeight").astype(np.float64) * _to_np(arrays, "genWeight") * lumi
@@ -182,6 +193,8 @@ def _select_chunk(
     }
     for col, vals in shifted.items():
         out[col] = vals[:, None]
+    # per-event xsec * gen weight without lumi/PU/trigSF, for filtering low-stat high-weight events
+    out["xsecGenWeight"] = (_to_np(arrays, "xsecWeight") * _to_np(arrays, "genWeight"))[:, None]
 
     for col, branch in gen.items():
         if col == "dr_vdaus":
@@ -194,13 +207,18 @@ def _select_chunk(
 
 
 def xrootd_url(path) -> str:
-    """EOS user files through xrootd: reading a few branches through the fuse mount is latency bound, ~5x slower"""
     return f"root://eosuser.cern.ch/{path}" if str(path).startswith("/eos/user/") else str(path)
 
 
-def read_branches(sample: str) -> list[str]:
-    """NanoTrees branches read for a sample (also the ones skim_nanotrees.py keeps)"""
-    branches = [b for pair in JET_BRANCHES.values() for b in pair]
+def _jet_branches(jet_columns: list[str] | None = None) -> dict[str, tuple[str, str]]:
+    if jet_columns is None:
+        return JET_BRANCHES
+    keep = {*jet_columns, *SELECTION_JET_COLUMNS}
+    return {col: branches for col, branches in JET_BRANCHES.items() if col in keep}
+
+
+def read_branches(sample: str, jet_columns: list[str] | None = None) -> list[str]:
+    branches = [b for pair in _jet_branches(jet_columns).values() for b in pair]
     branches += ["ht", "dphi_ak8_ak8", "passTrigPFHTScouting"]
     if sample != "data":
         branches += MC_WEIGHT_BRANCHES
@@ -217,11 +235,13 @@ def iterate_nanotrees(
     apply_trig_sf: bool = False,
     step_size: str = "500 MB",
     file_pattern: str | None = None,
+    jet_columns: list[str] | None = None,
 ):
     """
     Reads the NanoTrees of a sample one chunk at a time, for samples too large to hold in memory (e.g. QCD).
     Arguments as in load_nanotrees, plus file_pattern: glob of the sample files relative to nanotrees_dir,
-    overriding SAMPLE_FILES (e.g. to read mc/parts of a production whose merged files are incomplete).
+    overriding SAMPLE_FILES (e.g. to read mc/parts of a production whose merged files are incomplete),
+    and jet_columns: bbFatJet columns to read and return besides the ones the selection needs (None: all).
 
     Yields:
         (number of events read, skimmer-style columns of the passing events or None if none pass) per chunk
@@ -237,14 +257,14 @@ def iterate_nanotrees(
     is_data = sample == "data"
     gen = {} if is_data else GEN_BRANCHES.get(sample, {})
 
-    branches = read_branches(sample)
+    branches = read_branches(sample, jet_columns)
     if cuts.get("met") is not None:
         branches = [*branches, "met"]
 
     print(f"Loading {sample} from {len(files)} NanoTrees file(s)")
     for f in files:
         for arrays in _iterate_file(xrootd_url(f), branches, step_size):
-            yield len(arrays), _select_chunk(arrays, cuts, is_data, gen, mc_lumi, apply_trig_sf)
+            yield len(arrays), _select_chunk(arrays, cuts, is_data, gen, mc_lumi, apply_trig_sf, jet_columns)
 
 
 def _iterate_file(path: str, branches: list[str], step_size: str, retries: int = 5):
@@ -274,22 +294,8 @@ def load_nanotrees(
     mc_lumi: float | None = None,
     apply_trig_sf: bool = False,
     step_size: str = "500 MB",
+    file_patterns: dict[str, str] | None = None,
 ) -> dict[str, pd.DataFrame]:
-    """
-    Args:
-        nanotrees_dir: NanoTrees output directory, containing data/ and mc/
-        samples: template samples to load (keys of SAMPLE_FILES)
-        selection: cuts overriding DEFAULT_SELECTION
-        jmsr_vars: mass columns to add JMS/JMR variations for in MC, as copies of the nominal to be
-            filled by the template script's smearing (the NanoTrees have no mass variations)
-        mc_lumi: luminosity (fb^-1) to normalise MC to. None uses lumiwgt of the trees (full 2024),
-            which is only right if the data covers all of 2024
-        apply_trig_sf: multiply MC weights by the NanoTrees trigSF (bbbbSkimmer applies none for scouting)
-
-    Returns:
-        {sample: DataFrame} with (column, index) multi-index columns like utils.load_samples,
-        and MC weights already normalised to xsec * lumi.
-    """
     events_dict = {}
 
     for sample in samples:
@@ -298,7 +304,13 @@ def load_nanotrees(
         chunks = []
         n_read = 0
         for n_chunk, chunk in iterate_nanotrees(
-            nanotrees_dir, sample, selection, mc_lumi, apply_trig_sf, step_size
+            nanotrees_dir,
+            sample,
+            selection,
+            mc_lumi,
+            apply_trig_sf,
+            step_size,
+            file_pattern=(file_patterns or {}).get(sample),
         ):
             n_read += n_chunk
             if chunk is not None:
