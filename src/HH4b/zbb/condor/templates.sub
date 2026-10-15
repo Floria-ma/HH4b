@@ -1,0 +1,13 @@
+# condor_submit templates.sub (from this directory). Logs in logs/, outputs where scouting_templates.py writes them
+executable = run_templates.sh
+output = logs/templates.$(ClusterId).out
+error = logs/templates.$(ClusterId).err
+log = logs/templates.$(ClusterId).log
+
+# lxplus kills it at ~23 GB. Ask for ~3 GB per core: much larger requests (e.g. 24 cores) only match the few
+# "bigmcore" machines and sit idle
+request_cpus = 12
+request_memory = 36 GB
++JobFlavour = "tomorrow"
+
+queue

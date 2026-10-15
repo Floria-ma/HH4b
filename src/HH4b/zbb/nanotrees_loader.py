@@ -68,27 +68,33 @@ MC_WEIGHT_BRANCHES = [
 
 # scouting Zbb selection of bbbbSkimmer. The cuts below it are off by default (None)
 DEFAULT_SELECTION = {
-    "pt_lead": 300,  # highest-TXbb jet
-    "txbb_lead": 0.3,  # highest-TXbb jet
-    "pt_subl": 200,  # both jets
-    "dphi": np.pi / 2,  # NanoTrees already require > 2.2
-    "ht": 600,  # NanoTrees ht sums all scouting AK4 jets, the skimmer only the good_ak4jets
+    "pt_lead": 0,  # highest-TXbb jet
+    "txbb_lead": 0,  # highest-TXbb jet
+    "pt_subl": 0,  # both jets
+    "dphi": 2.2,  # NanoTrees already require > 2.2
+    "ht": 0,  # NanoTrees ht sums all scouting AK4 jets, the skimmer only the good_ak4jets
     "met": None,  # needs the met branch, which the skims of skim_nanotrees.py do not keep
-    "mreg": None,  # (min, max) regressed mass of both jets
-    "msd": None,  # (min, max) soft drop mass of both jets
+    "mreg": (40, 200),  # (min, max) regressed mass of both jets
+    "msd": (30, 190),  # (min, max) soft drop mass of both jets
     "msd_mreg_ratio": None,  # (min, max) of (msd + msd_mreg_shift) / regressed mass, for both jets
+    # shift of the msd in msd_mreg_ratio: one value for both jets, or (highest-TXbb jet, other jet)
     "msd_mreg_shift": 10.0,
 }
 
+# common_selections of the VH had channel (PlotTools/VH/cards/rDataframeScripts/vh_had.py), with the highest-TXbb
+# jet as its H candidate. Its MC weights also include trigSF (apply_trig_sf=True). met < 150 is in the NanoTrees
+# preselection
 VH_HAD_SELECTION = {
-    "pt_lead": 0,
+    **DEFAULT_SELECTION,
+    "pt_lead": 200,
     "txbb_lead": 0.0,
     "pt_subl": 0,
     "ht": 0,
     "dphi": 2.7,
-    "mreg": None,
+    "mreg": (40, 200),
     "msd": (30, 190),
     "msd_mreg_ratio": (0.8, 1.2),
+    "msd_mreg_shift": (15.0, 10.0),  # H, V candidate
 }
 
 # same as bbFatJetVQQMatch in GenSelection.py: both V daughters within dR < 0.8 of the jet
@@ -146,13 +152,16 @@ def _select_chunk(
     msd = jets["bbFatJetMsd"]
     if cuts.get("met") is not None:
         sel = sel & (_to_np(arrays, "met") < cuts["met"])
+    shift_tagged, shift_other = np.broadcast_to(cuts["msd_mreg_shift"], 2)
     for jet in (0, 1):
+        # jet 1 (subleading pT) is the highest-TXbb jet if swap
+        is_tagged = swap if jet == 1 else ~swap
         if cuts.get("mreg") is not None:
             sel = sel & (mreg[jet] > cuts["mreg"][0]) & (mreg[jet] < cuts["mreg"][1])
         if cuts.get("msd") is not None:
             sel = sel & (msd[jet] > cuts["msd"][0]) & (msd[jet] < cuts["msd"][1])
         if cuts.get("msd_mreg_ratio") is not None:
-            shifted = msd[jet] + cuts["msd_mreg_shift"]
+            shifted = msd[jet] + np.where(is_tagged, shift_tagged, shift_other)
             sel = (
                 sel
                 & (shifted > cuts["msd_mreg_ratio"][0] * mreg[jet])
@@ -170,7 +179,7 @@ def _select_chunk(
         out[col] = np.stack([np.where(swap, vals1, vals0), np.where(swap, vals0, vals1)], axis=1)
 
     if is_data:
-        out["weight"] = np.ones((np.sum(sel), 1))
+        out["weight"] = np.ones((np.sum(sel), 1), dtype=np.float32)  # float32: data has ~10^8 events
         return out
 
     arrays = arrays[sel]
@@ -236,6 +245,7 @@ def iterate_nanotrees(
     step_size: str = "500 MB",
     file_pattern: str | None = None,
     jet_columns: list[str] | None = None,
+    verbose: bool = True,
 ):
     """
     Reads the NanoTrees of a sample one chunk at a time, for samples too large to hold in memory (e.g. QCD).
@@ -261,7 +271,8 @@ def iterate_nanotrees(
     if cuts.get("met") is not None:
         branches = [*branches, "met"]
 
-    print(f"Loading {sample} from {len(files)} NanoTrees file(s)")
+    if verbose:
+        print(f"Loading {sample} from {len(files)} NanoTrees file(s)")
     for f in files:
         for arrays in _iterate_file(xrootd_url(f), branches, step_size):
             yield len(arrays), _select_chunk(arrays, cuts, is_data, gen, mc_lumi, apply_trig_sf, jet_columns)
@@ -286,6 +297,28 @@ def _iterate_file(path: str, branches: list[str], step_size: str, retries: int =
             warnings.warn(f"{e}\nretrying {path} from entry {entry_start}", stacklevel=1)
 
 
+def _load_file(
+    nanotrees_dir: str, sample: str, file_pattern: str, first_jet_only: bool, drop: list[str], kwargs: dict
+):
+    """Selected columns of one file, concatenated over its chunks (None if no events pass), and the events read"""
+    chunks = []
+    n_read = 0
+    for n_chunk, chunk in iterate_nanotrees(
+        nanotrees_dir, sample, file_pattern=file_pattern, verbose=False, **kwargs
+    ):
+        n_read += n_chunk
+        if chunk is not None:
+            chunk = {
+                col: (vals[:, :1].copy() if first_jet_only else vals)
+                for col, vals in chunk.items()
+                if col not in drop
+            }
+            chunks.append(chunk)
+    if not chunks:
+        return None, n_read
+    return {col: np.concatenate([chunk[col] for chunk in chunks]) for col in chunks[0]}, n_read
+
+
 def load_nanotrees(
     nanotrees_dir: str,
     samples: list[str],
@@ -295,41 +328,70 @@ def load_nanotrees(
     apply_trig_sf: bool = False,
     step_size: str = "500 MB",
     file_patterns: dict[str, str] | None = None,
+    jet_columns: dict[str, list[str]] | None = None,
+    first_jet_only: list[str] = (),
+    n_workers: int = 1,
 ) -> dict[str, pd.DataFrame]:
+    # jet_columns: {sample: bbFatJet columns to keep}, all columns for the samples not in it (the selection still uses
+    # its columns).
+    # first_jet_only: samples to keep only the highest-TXbb jet of. n_workers: processes reading the files in parallel
+    from concurrent.futures import ProcessPoolExecutor
+
     events_dict = {}
 
     for sample in samples:
         is_data = sample == "data"
 
-        chunks = []
-        n_read = 0
-        for n_chunk, chunk in iterate_nanotrees(
-            nanotrees_dir,
-            sample,
-            selection,
-            mc_lumi,
-            apply_trig_sf,
-            step_size,
-            file_pattern=(file_patterns or {}).get(sample),
-        ):
-            n_read += n_chunk
-            if chunk is not None:
-                chunks.append(chunk)
+        file_pattern = (file_patterns or {}).get(sample) or SAMPLE_FILES[sample]
+        # largest first, so that the parallel workers finish at about the same time
+        files = sorted(Path(nanotrees_dir).glob(file_pattern), key=lambda f: f.stat().st_size, reverse=True)
+        if not files:
+            raise FileNotFoundError(f"No NanoTrees for {sample} in {nanotrees_dir}/{file_pattern}")
+        kwargs = {
+            "selection": selection,
+            "mc_lumi": mc_lumi,
+            "apply_trig_sf": apply_trig_sf,
+            "step_size": step_size,
+            "jet_columns": (jet_columns or {}).get(sample),
+        }
+        keep = (jet_columns or {}).get(sample)
+        drop = [] if keep is None else [col for col in JET_BRANCHES if col not in keep]
+        args = [
+            (nanotrees_dir, sample, str(f.relative_to(nanotrees_dir)), sample in first_jet_only, drop, kwargs)
+            for f in files
+        ]
 
-        if not chunks:
+        print(f"Loading {sample} from {len(files)} NanoTrees file(s) with {min(n_workers, len(files))} process(es)")
+        if n_workers > 1 and len(files) > 1:
+            with ProcessPoolExecutor(min(n_workers, len(files))) as pool:
+                results = list(pool.map(_load_file, *zip(*args)))
+        else:
+            results = [_load_file(*a) for a in args]
+
+        n_read = sum(n for _, n in results)
+        file_columns = [cols for cols, _ in results if cols is not None]
+        del results
+
+        if not file_columns:
             warnings.warn(f"No {sample} events pass the selection!", stacklevel=1)
             continue
 
-        columns = {col: np.concatenate([chunk[col] for chunk in chunks]) for col in chunks[0]}
+        # free each file's column once it is concatenated, so that the peak memory is ~1 copy of the sample
+        columns = {}
+        for col in list(file_columns[0]):
+            columns[col] = np.concatenate([fc.pop(col) for fc in file_columns])
+        del file_columns
         if not is_data:
             for var in jmsr_vars:
                 for shift in jmsr_shifts:
                     columns[f"{var}_{shift}"] = columns[var].copy()
 
-        # same layout as SkimmerABC.to_pandas
-        events = pd.concat(
-            [pd.DataFrame(vals) for vals in columns.values()], axis=1, keys=list(columns.keys())
+        # same layout as SkimmerABC.to_pandas, (column, jet index) columns. copy=False keeps the arrays instead of
+        # consolidating them into a second copy
+        events = pd.DataFrame(
+            {(col, i): vals[:, i] for col, vals in columns.items() for i in range(vals.shape[1])}, copy=False
         )
+        del columns
         events["finalWeight"] = events["weight"]
 
         print(

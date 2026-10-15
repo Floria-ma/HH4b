@@ -23,6 +23,7 @@ from numpy.typing import ArrayLike
 from tqdm import tqdm
 
 from HH4b.zbb import nanotrees_loader
+from HH4b.zbb.nanotrees_loader import DEFAULT_SELECTION
 
 plt.style.use(hep.style.CMS)
 hep.style.use("CMS")
@@ -91,7 +92,7 @@ NANOTREES_DATA_FILES = "data/skim/*/ScoutingPFRun3_tree_*.root"
 # selection of the templates). tagger_Cali_2024_had has no tagger preselection, so TXbb > 0.0 is inclusive
 NANOTREES_MIN_TXBB = 0.0
 # common selection of the VH had analysis (vh_had.py), i.e. no pT/HT cut but mass windows on both jets
-NANOTREES_SELECTION = {**nanotrees_loader.VH_HAD_SELECTION, "txbb_lead": NANOTREES_MIN_TXBB}
+NANOTREES_SELECTION = {**nanotrees_loader.DEFAULT_SELECTION, "txbb_lead": NANOTREES_MIN_TXBB}
 
 REPROCESS = False
 # parallel processes reading the data files (each holds a ~500 MB chunk of branches, a few GB at its peak)
@@ -164,7 +165,7 @@ def iterate_DATA_file(file, mass_variable: str):
         chunks = nanotrees_loader.iterate_nanotrees(
             NANOTREES_DIR,
             "data",
-            selection=NANOTREES_SELECTION,
+            selection=DEFAULT_SELECTION,
             file_pattern=str(Path(file).relative_to(NANOTREES_DIR)),
             jet_columns=[details["txbb_var"], "bbFatJetPt", mass_variable],
         )
@@ -647,9 +648,9 @@ def main():
         (0.0, 1.0),
         #(0.3, 1.0),
         # (0.4, 1.0),
-        (0.4, 0.8),
-        (0.8, 0.9),
-        (0.9, 1.0),
+        (0.4, 0.75),
+        (0.75, 0.93),
+        (0.93, 1.0),
         # (0.92, 1.0),
         #(0.94, 1.0),
         #(0.96, 1.0),
@@ -663,17 +664,18 @@ def main():
 
     # VHcc analysis low/high pT regions, now check more granular pT regions
     pt_regions = [
-        (170,200),
-        (200, 225),
+        (170,225),
+        #(200, 225),
         (225, 250),
         (250,275),
         (275, 300),
-        (300,325),
-        (325, 350),
-        (350, 375),
-        (350,400),
-        (375, 400),
-        (400, 500),
+       # (300,325),
+       # (325, 350),
+        #(350, 375),
+        (300,350),
+        (350,500),
+       # (375, 400),
+       # (400, 500),
         (500,1300 ),
         # (170, 275),
         # (275,300),
@@ -693,7 +695,7 @@ def main():
 
     # inputs of the saved hists: a saved file made with other ones is reprocessed instead of silently reused
     if INPUT == "nanotrees":
-        inputs = {"dir": NANOTREES_DIR, "files": NANOTREES_DATA_FILES, "selection": NANOTREES_SELECTION}
+        inputs = {"dir": NANOTREES_DIR, "files": NANOTREES_DATA_FILES, "selection": DEFAULT_SELECTION}
     else:
         inputs = {"dirs": YEAR_DIRS}
     config = {"inputs": inputs, "mass_variable": mass_variable, "txbb_regions": txbb_regions,

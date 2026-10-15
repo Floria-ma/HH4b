@@ -34,6 +34,7 @@ from HH4b.hh_vars import (
     jmsr,
     qcd_key,
 )
+from HH4b.utils import blindBins
 from HH4b.postprocessing.datacardHelpers import (
     ShapeVar,
     Syst,
@@ -157,6 +158,19 @@ add_bool_arg(
     default=False,
 )
 add_bool_arg(parser, "jmsr", "Do JMS/JMR uncertainties", default=True)
+add_bool_arg(
+    parser,
+    "blinded",
+    "Remove --blind-window (the H signal region, where scouting_templates.py zeroes the pass data) from the fit",
+    default=True,
+)
+parser.add_argument(
+    "--blind-window",
+    default=[100, 150],
+    nargs=2,
+    type=float,
+    help="mass window to blind, BLIND_WINDOW of scouting_templates.py",
+)
 add_bool_arg(parser, "jesr", "Do JES/JER uncertainties", default=False)
 args = parser.parse_args()
 
@@ -406,6 +420,15 @@ def get_templates(
         for year in templates_dict:
             for region in templates_dict[year]:
                 templates_dict[year][region] *= scale
+
+    if args.blinded:
+        # zero every sample in the window, in every region (as the "MCBlinded" regions of the HH4b cards): the pass
+        # data is zeroed there in the templates, so the MC and the fail (whose QCD is the pass QCD / TF) must be too,
+        # for these bins to drop out of the fit. qcd_eff of alphabet_fit then comes from the sidebands
+        logging.info(f"Blinding {args.blind_window} in all samples and regions")
+        for year in templates_dict:
+            for region in templates_dict[year]:
+                blindBins(templates_dict[year][region], args.blind_window)
 
     templates_summed = sum_templates(templates_dict, years)
     return templates_dict, templates_summed

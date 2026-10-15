@@ -26,17 +26,30 @@ NANOTREES_FILES = {
     "Wto2Q": "mc/skim/w2qq_tree.root",
     "ttbar": "mc/skim/ttbar_tree.root",
     "QCD": "mc/skim/qcd*_tree.root",
+    "singletop": "mc/skim/singletop_tree.root",
 }
+# processes reading the NanoTrees files of a sample in parallel (each holds a ~500 MB chunk, a few GB at its peak)
+NANOTREES_N_WORKERS = 6
+
+# NanoTrees event selection: "zbb" the scouting Zbb one of bbbbSkimmer, "vh" the VH had channel one
+SELECTION = "zbb"
+NANOTREES_SELECTIONS = {
+    "zbb": nanotrees_loader.DEFAULT_SELECTION,
+    "vh": nanotrees_loader.VH_HAD_SELECTION,
+}
+# the VH had channel weights its MC with the trigger SFs instead of an HT cut on the trigger plateau
+NANOTREES_APPLY_TRIG_SF = SELECTION == "zbb"
 
 tag = "14Feb2026_VJets_TT_Only_v15_scouting_zbb" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
 if INPUT_FORMAT == "nanotrees":
-    tag = f"nanotrees_{Path(NANOTREES_DIR).name}"
+    tag = f"nanotrees_{Path(NANOTREES_DIR).name}_{SELECTION}"
 
 # Pass and fail regions
-txbb_bins = [0.75, 0.93, 1.0]
+txbb_bins = [0.93, 1.0] #0.75 #0.93
 min_txbb = txbb_bins[0]
 # pT bins
-pt_bins = [170, 250, 300, 350, 500, 1300]
+#pt_bins = [170, 225, 250, 275, 300, 350, 500, 900, 1300]
+pt_bins = [170, 350, 450, 550, 1300]
 
 txbb_bins = list(zip(txbb_bins[:-1], txbb_bins[1:]))
 pt_bins = list(zip(pt_bins[:-1], pt_bins[1:]))
@@ -60,6 +73,13 @@ tagger_branch = "bbFatJetScoutParTTXbb"
 # Regressed mass to fit. The NanoTrees only have the resonance mass, skimmer outputs also "bbFatJetScoutParTmassCorrectedX2p"
 MASS_VAR = "bbFatJetScoutParTmassCorrResonance"
 MASS_LABEL = r"$m_\mathrm{res}$ (GeV)"
+# H signal region of the VH analysis, whose selection these events share: data is zeroed there in the pass regions
+# (templates and plots). The QCD estimate and the fit have to skip these bins
+BLIND_WINDOW = [100, 150]
+# fail region of the QCD estimate (qcd_estimation.py): the fail TXbb range with this lower bound. The "fail" region of
+# the fit (TXbb from 0) is kept as is
+QCD_FAIL_TXBB_MIN = 0.4
+QCD_FAIL_REGION = f"fail_TXbb{str(QCD_FAIL_TXBB_MIN).replace('.', 'p')}to{str(min(0.9, min_txbb)).replace('.', 'p')}"
 
 
 YEARS = [
@@ -113,8 +133,11 @@ SAMPLES_DICT = {
         "Run2024H",
         "Run2024I"
     ],
-    # QCD from data in CR
+    # QCD MC, only to compare with the QCD estimated from data (qcd_estimation.py writes that one as "qcd").
+    # Named "QCD" so that its templates QCD_{region} don't clash with the estimate's qcd_{region}
+    "QCD": ["QCD"],
     "ttbar": ["TTto4Q", "TTtoLNu2Q", "TTto2L2Nu"],
+    "singletop": ["singletop"],
     "Zto2Q": ["Zto2Q-4Jets"],
     "Wto2Q": ["Wto2Q-3Jets"],
 }
@@ -184,8 +207,9 @@ WQQ_extra_columns = [("GenWPt", 1), ("GenWCS", 1), ("GenWUD", 1), ("bbFatJetVQQM
 
 extra_columns_dict = {
     "data": [],
-    # "qcd": load_weight_shifts, # Don't bother loading QCD, just a waste of time since it is estimted from data anyway
+    "QCD": load_weight_shifts,
     "ttbar": MC_common_extra_columns,
+    "singletop": MC_common_extra_columns,
     # "hbb": MC_common_extra_columns, # Don't have hbb samples
     "Zto2Q": MC_common_extra_columns + ZQQ_extra_columns,
     "Wto2Q": MC_common_extra_columns + WQQ_extra_columns,
@@ -214,6 +238,10 @@ def get_era_path(year):
     return PROCESSED_DIR / f"Zbb_events_{year}.pkl"
 
 def get_combined_path(combined_year):
+    # a combined year of a single era is that era's file, instead of a second copy of it
+    year_list = YEARS_COMBINED_DICT[combined_year]
+    if len(year_list) == 1:
+        return get_era_path(year_list[0])
     return PROCESSED_DIR / f"Zbb_events_{combined_year}.pkl"
 
 
@@ -254,10 +282,19 @@ else:
                     dataframes = nanotrees_loader.load_nanotrees(
                         NANOTREES_DIR,
                         [sample],
-                        selection=nanotrees_loader.VH_HAD_SELECTION,
+                        selection=NANOTREES_SELECTIONS[SELECTION],
+                        apply_trig_sf=NANOTREES_APPLY_TRIG_SF,
                         jmsr_vars=mass_vars if DO_JMSR else [],
                         mc_lumi=NANOTREES_MC_LUMI,
                         file_patterns=NANOTREES_FILES,
+                        # the templates only use the highest-TXbb jet: its pT, TXbb and mass (and the mass_vars
+                        # for the MC JMS/JMR variations). Keeping only these is what fits data (~2x10^8 events) in memory
+                        jet_columns={
+                            s: [tagger_branch, "bbFatJetPt", MASS_VAR] + ([] if s == "data" else mass_vars)
+                            for s in SAMPLES_DICT
+                        },
+                        first_jet_only=list(SAMPLES_DICT),
+                        n_workers=NANOTREES_N_WORKERS,
                     )
                 else:
                     dataframes = {
@@ -272,24 +309,14 @@ else:
                     }
 
                 # Process and concatenate dataframes for this sample
-                sample_dfs = []
-                for key, df in dataframes.items():
-                    # Handle pT variations
-                    for pt_var in ["bbFatJetPt"] + pt_variations:
-                        if pt_var not in df.columns:
-                            for i in range(2):
-                                df[f"{pt_var}{i}"] = df[("bbFatJetPt", i)].copy()
+                # the pT and mass variations missing in a sample (e.g. data) are added per pT bin below, as copies
+                # of the nominal for the events of that bin only
+                sample_dfs = list(dataframes.values())
 
-                    # Handle mass variations
-                    for mass_var in mass_vars + mass_variations:
-                        if mass_var not in df.columns:
-                            for i in range(2):
-                                df[f"{mass_var}{i}"] = df[(mass_var.split("_")[0], i)].copy()
-
-                    sample_dfs.append(df)
-
-                # Concatenate all dataframes for this sample
-                events_era[sample] = pd.concat(sample_dfs, ignore_index=True)
+                # Concatenate all dataframes for this sample (concat would copy a single one too)
+                events_era[sample] = (
+                    sample_dfs[0] if len(sample_dfs) == 1 else pd.concat(sample_dfs, ignore_index=True)
+                )
                 print(f"  {sample}: {len(events_era[sample])} events")
 
                 # Clear intermediate dataframes to free memory
@@ -316,7 +343,12 @@ else:
     for combined_year, year_list in YEARS_COMBINED_DICT.items():
         combined_path = get_combined_path(combined_year)
 
-        if REPROCESS or not combined_path.exists():
+        if len(year_list) == 1:
+            # nothing to combine, the era file written above is the combined year
+            print(f"\nLoading {combined_year} from {combined_path}...")
+            with combined_path.open("rb") as f:
+                events_combined[combined_year] = pd.read_pickle(f)
+        elif REPROCESS or not combined_path.exists():
             print(f"\nCombining eras for {combined_year}: {year_list}")
 
             # Load each era
@@ -399,9 +431,10 @@ for year in YEARS_COMBINED_DICT.keys():
     ZtoCC = is_ZCC & matched
     ZtoQQ = is_ZQQ & matched
     Z_unmatched = ~matched
-    events_combined[year]["Zto2Q_BB"] = Zto2Q[ZtoBB]
-    events_combined[year]["Zto2Q_CC"] = Zto2Q[ZtoCC]
-    events_combined[year]["Zto2Q_QQ"] = Zto2Q[ZtoQQ]
+    # explicit copies, the JMS/JMR smearing below writes to them
+    events_combined[year]["Zto2Q_BB"] = Zto2Q[ZtoBB].copy()
+    events_combined[year]["Zto2Q_CC"] = Zto2Q[ZtoCC].copy()
+    events_combined[year]["Zto2Q_QQ"] = Zto2Q[ZtoQQ].copy()
     # leave the unmatched to bkg fits
     # events_combined[year]["Zto2Q_unmatched"] = Zto2Q[Z_unmatched]
 
@@ -466,7 +499,7 @@ def apply_jmsr_smearing_in_templates(
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Zto2Q_unmatched", "Wto2Q", "hbb", "ttbar", "qcd"]
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Zto2Q_unmatched", "Wto2Q", "ttbar", "qcd"]
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar", "qcd"]
-bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar"]
+bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar", "singletop", "QCD"]
 sig_keys = []
 bg_order = list(reversed(bkg_keys))
 
@@ -527,6 +560,15 @@ for year in YEARS_COMBINED_DICT:
 
     events = events_combined[year]
 
+    # memory (~2x10^8 data events): the templates weight with finalWeight, so drop its copy "weight", and sort each
+    # sample by pT so that each pT bin below is a slice of the rows (a view) instead of a copy
+    for sample_name in list(events):
+        df = events[sample_name]
+        if "weight" in df.columns.get_level_values(0):
+            del df["weight"]
+        events[sample_name] = df.iloc[np.argsort(df[("bbFatJetPt", 0)].to_numpy(), kind="stable")]
+        del df
+
     # smear once per year: it modifies the nominal mass in place, so inside the pT bin loop it compounded per bin
     for sample_name, df in events.items():
         if sample_name != "data":
@@ -544,6 +586,29 @@ for year in YEARS_COMBINED_DICT:
         pt_low_str = str(pt_low)
         pt_high_str = str(pt_high)
         pt_bin_key = f"pT{pt_low_str}to{pt_high_str}"
+
+        # the events of this pT bin, so that the selections of each region and JMS/JMR shift do not run over all
+        # events. Same cut as the pT cut of the regions (low <= pT < high); only valid without the JES/JER pT shifts
+        assert not DO_JESR, "the pT bin slicing does not account for the JES/JER shifts of the pT"
+        events_bin = {}
+        for sample_name, df in events.items():
+            # the events are sorted by pT (NaN last), so low <= pT < high is a slice
+            pt = df[("bbFatJetPt", 0)].to_numpy()
+            i_low, i_high = np.searchsorted(pt, [pt_low, pt_high], side="left")
+            df = df.iloc[i_low:i_high]
+
+            # the selections and shapes of each jshift use the shifted variable for every sample, so the samples
+            # without the variations (data) get copies of the nominal. New columns of the slice only, so the
+            # chained assignment warning does not apply
+            with pd.option_context("mode.chained_assignment", None):
+                for pt_var in pt_variations:
+                    if pt_var not in df.columns:
+                        df[f"{pt_var}0"] = df[("bbFatJetPt", 0)]
+                for mass_var in mass_variations:
+                    if mass_var.startswith(MASS_VAR) and mass_var not in df.columns:
+                        df[f"{mass_var}0"] = df[(MASS_VAR, 0)]
+
+            events_bin[sample_name] = df
 
         cutflows_dir = Path(f"{out_dir}/cutflows/{year}")
         cutflows_dir.mkdir(parents=True, exist_ok=True)
@@ -571,7 +636,7 @@ for year in YEARS_COMBINED_DICT:
 
                 cutflows = {}
                 
-                for sample in events:
+                for sample in events_bin:
                     cutflows[sample] = OrderedDict()
                     cutflows[sample]["Skimmer Preselection"] = events_combined[year][sample][
                         "finalWeight"
@@ -597,6 +662,14 @@ for year in YEARS_COMBINED_DICT:
                 },
                 label="fail",
             )
+            selection_regions[QCD_FAIL_REGION] = postprocessing.Region(
+                cuts={
+                    pt_branch: [pt_low, pt_high],
+                    mass_branch: [m_low, m_high],
+                    f"{tagger_branch}0": [QCD_FAIL_TXBB_MIN, min(0.9, min_txbb)],
+                },
+                label=QCD_FAIL_REGION,
+            )
             print(f"Selection regions for {year} with jshift {jshift}: {selection_regions.keys()}")
 
             fit_shape_var = postprocessing.ShapeVar(
@@ -604,10 +677,11 @@ for year in YEARS_COMBINED_DICT:
                 MASS_LABEL,
                 [n_mass_bins, m_low, m_high],
                 reg=True,
+                blind_window=BLIND_WINDOW,
             )
 
             ttemps = postprocessing.get_templates(
-                events,
+                events_bin,
                 year=year,
                 sig_keys=sig_keys,
                 plot_sig_keys=sig_keys,
@@ -626,7 +700,7 @@ for year in YEARS_COMBINED_DICT:
                 show=False,
                 energy=13.6,
                 jshift=jshift,
-                blind=False,
+                blind=True,
             )
             templates = {**templates, **ttemps}
 

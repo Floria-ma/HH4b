@@ -11,6 +11,7 @@ from tqdm import tqdm
 import mplhep as hep
 import matplotlib.ticker as mticker
 from HH4b.zbb import nanotrees_loader
+from HH4b.zbb.nanotrees_loader import DEFAULT_SELECTION
 
 plt.style.use(hep.style.CMS)
 hep.style.use("CMS")
@@ -79,7 +80,7 @@ NANOTREES_QCD_FILES = "mc/skim/qcd*_tree.root"
 
 NANOTREES_MIN_TXBB = 0.0
 # common selection of the VH had analysis (vh_had.py), i.e. no pT/HT cut but mass windows on both jets
-NANOTREES_SELECTION = {**nanotrees_loader.VH_HAD_SELECTION, "txbb_lead": NANOTREES_MIN_TXBB}
+NANOTREES_SELECTION = {**nanotrees_loader.DEFAULT_SELECTION, "txbb_lead": NANOTREES_MIN_TXBB}
 # drop QCD events with xsecWeight * genWeight above this (low-stat HT bins with huge weights), None to keep all
 NANOTREES_MAX_QCD_WEIGHT = 1.0
 
@@ -106,7 +107,7 @@ def iterate_QCD(qcd_filelist: list = None, mass_variable: str = mass_variable):
     """Yields (TXbb, pT, mass, weight) of the highest-TXbb jet in QCD, per skimmer file or NanoTrees chunk"""
     if INPUT == "nanotrees":
         chunks = nanotrees_loader.iterate_nanotrees(
-            NANOTREES_DIR, "QCD", selection=NANOTREES_SELECTION, file_pattern=NANOTREES_QCD_FILES
+            NANOTREES_DIR, "QCD", selection=DEFAULT_SELECTION, file_pattern=NANOTREES_QCD_FILES
         )
         for _, chunk in tqdm(chunks, desc="Aggregating QCD TXbb regions", unit=" chunks"):
             if chunk is None:
@@ -441,7 +442,7 @@ def compare_shapes_in_pt_region(aggregate_dict, reference_key, pt_region=(300, 4
         )
 
     ax2.axhline(y=1, color='black', linestyle='--', linewidth=2)
-    ax2.set_ylim(1/3.0, 2.0)
+    ax2.set_ylim(0.5, 1.5)
     ax2.set_xlabel(details["mass_label"])
     ax2.set_ylabel('Ratio')
     #ax2.grid(axis='y', linestyle='-', linewidth=1, which='both')
@@ -569,9 +570,9 @@ def main():
         (0.0, 1.0),
         #(0.3, 1.0),
         # (0.4, 1.0),
-        (0.4, 0.8),
-        (0.8, 0.9),
-        (0.9, 1.0),
+        (0.4, 0.75),
+        (0.75, 0.93),
+        (0.93, 1.0),
         # (0.92, 1.0),
         #(0.94, 1.0),
         #(0.96, 1.0),
@@ -581,13 +582,19 @@ def main():
     if INPUT == "nanotrees":
         txbb_regions = [region for region in txbb_regions if region[0] >= NANOTREES_MIN_TXBB]
 
-    '''
+    
     pt_regions = [
-        (300, 450),
-        (450, 550),
-        (550, 10000),
-        # (300, 10000),
-        # (450, 10000)
+        (170,225),
+        (225, 250),
+        (250,275),
+        (275, 300),
+        #(300,350),
+        (300,325),
+        (325, 350),
+        (350,500),
+        #(500,1300 ),
+        (500,900),
+        (900,1300)
     ]
     '''
 
@@ -596,19 +603,19 @@ def main():
         # try different binnings
         # now 170-350 more problematic
         #(170, 250),
-        (170,200),
-        (170,500),
-        (200, 225),
+        (170,225),
+        #(200, 225),
         (225, 250),
         (250,275),
         (275, 300),
-        (300,325),
-        (325, 350),
-        (350, 375),
-        (350,400),
-        (375, 400),
-        (400, 500),
-        (500,1300),
+       # (300,325),
+       # (325, 350),
+        #(350, 375),
+        (300,350),
+        (350,500),
+       # (375, 400),
+       # (400, 500),
+        (500,1300 ),
         # (170, 275),
         # (275,300),
         # (300,325),
@@ -617,16 +624,11 @@ def main():
         # (375, 500),
         # (500, 1300)
     ]
-
-    #pt_regions = [
-    #    (300, 450),
-    #    (450,550 ), 
-    #    (550, 10000)
-    #]
+    '''
 
     # inputs of the saved hists: a saved file made with other ones is reprocessed instead of silently reused
     if INPUT == "nanotrees":
-        inputs = {"dir": NANOTREES_DIR, "files": NANOTREES_QCD_FILES, "selection": NANOTREES_SELECTION,
+        inputs = {"dir": NANOTREES_DIR, "files": NANOTREES_QCD_FILES, "selection": DEFAULT_SELECTION,
                   "max_qcd_weight": NANOTREES_MAX_QCD_WEIGHT}
     else:
         inputs = {"dirs": YEAR_DIR}
