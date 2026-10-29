@@ -86,6 +86,9 @@ NANOTREES_MAX_QCD_WEIGHT = 1.0
 
 REPROCESS = False
 
+# take the ratios to the inclusive TXbb shape (txbb_regions[0]) instead of the first TXbb region (txbb_regions[1])
+RATIO_TO_INCLUSIVE = True
+
 SAVE_TO = "/eos/user/z/zima/QCD_SPECTRA"
 SAVE_TO_FILE = f"{SAVE_TO}/saved_aggregate_dict_{filename_suffix}_{mass_variable}.pkl"
 RESULTS_DIR = f"{SAVE_TO}/results"
@@ -572,7 +575,8 @@ def main():
         # (0.4, 1.0),
         (0.4, 0.75),
         (0.75, 0.93),
-        (0.93, 1.0),
+        (0.93, 0.96),
+        (0.96,1.0)
         # (0.92, 1.0),
         #(0.94, 1.0),
         #(0.96, 1.0),
@@ -584,17 +588,21 @@ def main():
 
     
     pt_regions = [
-        (170,225),
-        (225, 250),
-        (250,275),
-        (275, 300),
+       # (170,225),
+       # (225, 250),
+       # (250,275),
+       # (275, 300),
         #(300,350),
-        (300,325),
-        (325, 350),
-        (350,500),
+       # (300,325),
+       # (325, 350),
+        (350,400),
+        (400,450),
+        (450,500),
         #(500,1300 ),
-        (500,900),
-        (900,1300)
+        (500,550),
+        (550,600),
+        (600,900),
+        (900,13000)
     ]
     '''
 
@@ -681,10 +689,11 @@ def main():
         print(f"{key}: {region_data['total_weight']} events")
 
     print("Creating plots...")
+    ref_region = txbb_regions[0] if RATIO_TO_INCLUSIVE else txbb_regions[1]
     for pt_region in pt_regions:
         fig = compare_shapes_in_pt_region(
             aggregate_dict,
-            reference_key=f"TXbb = [{txbb_regions[1][0]}, {txbb_regions[1][1]}], pT = [{pt_region[0]}, {pt_region[1]}]",
+            reference_key=f"TXbb = [{ref_region[0]}, {ref_region[1]}], pT = [{pt_region[0]}, {pt_region[1]}]",
             pt_region=pt_region
         )
         fig.savefig(f"{RESULTS_DIR}/pT{pt_region[0]}to{pt_region[1]}_{filename_suffix}_{mass_variable}.pdf")

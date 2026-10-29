@@ -7,6 +7,7 @@
 # window: the VHcc normalisation (to the fail integral, then times epsilon) assumes a TF flat across the window.
 import ROOT
 import numpy as np
+import uproot
 import argparse
 import glob
 import os
@@ -21,7 +22,7 @@ def subtract_non_qcd(hist, file, region):
     """(data - nonQCD MC)"""
     data_minus_MC = hist.Clone()
     data_minus_MC.SetDirectory(0)
-    mc_names = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar", "singletop"]  # bkg_keys of scouting_templates.py
+    mc_names = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar", "singletop", "hbb"]  # bkg_keys and sig_keys of scouting_templates.py
     for mc in mc_names:
         h = file.Get(f"{mc}_{region}")
         if h:
@@ -45,9 +46,11 @@ parser = argparse.ArgumentParser('qcd estimation (Zbb)')
 parser.add_argument('--basedir', help='Input directory (output directory of scouting_templates.py)',
                     default="/eos/user/z/zima/scouting/templates/nanotrees_tagger_Cali_2024_had_vh")
 parser.add_argument('--year', default="2024All")
-parser.add_argument('--fail-region', default=None,
-                    help='fail region for the QCD shape. Default: the fail_TXbb* region in the templates, i.e. '
-                         'QCD_FAIL_REGION of scouting_templates.py (TXbb from 0.4 to the fail upper bound)')
+parser.add_argument('--fail-region', default="fail",
+                    help='fail region for the QCD shape. Default: the full fail region of scouting_templates.py '
+                         '(TXbb from 0 to the fail upper bound)')
+parser.add_argument('--tf', choices=["quadratic", "linear"], default="quadratic",
+                    help='polynomial in the mass of the TF fitted to the pass/fail ratio')
 options = parser.parse_args()
 basedir = options.basedir
 year = options.year
@@ -57,7 +60,7 @@ fail_region = options.fail_region
 # category configuration: every pass region of every pT bin
 # templates file : templates_{year}_{pT bin}.root
 # pass           : {sample}_pass_TXbb{low}to{high}_{pT bin}
-# fail (QCD)     : {sample}_{fail_region}, TXbb 0.4 to the fail upper bound (the fit's "fail" starts at 0)
+# fail (QCD)     : {sample}_{fail_region}, TXbb 0 to the fail upper bound
 # -------------------------
 categories = {}
 template_files = sorted(glob.glob(os.path.join(basedir, f"templates_{year}_pT*.root")))
@@ -69,16 +72,8 @@ for fname in template_files:
         m = re.fullmatch(r"data_(pass_TXbb.*_pT\d+to\d+)", key.GetName().split(";")[0])
         if m:
             categories[m.group(1)] = {"file": fname}
-        # the QCD fail region, whose name follows the TXbb bins of the templates
-        #m = re.fullmatch(r"data_(fail_TXbb[^_]+to[^_]+)", key.GetName().split(";")[0])
-        m = re.fullmatch(r"data_(fail)", key.GetName().split(";")[0])
-
-        if m and fail_region is None:
-            fail_region = m.group(1)
     f.Close()
 
-if fail_region is None:
-    raise RuntimeError(f"No fail_TXbb* region in the templates of {basedir}, give it with --fail-region")
 print(f"QCD fail region: {fail_region}")
 
 flavor = "Zbb"
@@ -114,10 +109,12 @@ for cat_name, cat_cfg in categories.items():
     ratio.SetDirectory(0)
     ratio.Divide(H_qcd_fail_blind)
 
-    # quadratic TF
+    # linear or quadratic TF
     x_min = ratio.GetXaxis().GetXmin()
     x_max = ratio.GetXaxis().GetXmax()
-    fit_func = ROOT.TF1(f"fit_{flavor}_{cat_name}", "[0] + [1]*x + [2]*x**2", x_min, x_max)
+    tf_formula = "[0] + [1]*x" if options.tf == "linear" else "[0] + [1]*x + [2]*x**2"
+    fit_func = ROOT.TF1(f"fit_{flavor}_{cat_name}", tf_formula, x_min, x_max)
+    n_par = fit_func.GetNpar()
 
     # epsilon from the blinded histograms
     H_N_pass = H_goodV_pass_blind.Integral()
@@ -127,12 +124,10 @@ for cat_name, cat_cfg in categories.items():
 
     # fit ratio, chi2 with the ratio errors ("W" would ignore them: equal weights and meaningless parameter errors)
     f = ratio.Fit(fit_func, "S")
-    p0, p1, p2 = f.Parameter(0), f.Parameter(1), f.Parameter(2)
-    p0_err, p1_err, p2_err = f.ParError(0), f.ParError(1), f.ParError(2)
-    cov = f.GetCovarianceMatrix()
-    cov_p0_p1 = cov[0][1]
-    cov_p0_p2 = cov[0][2]
-    cov_p1_p2 = cov[1][2]
+    pars = np.array([f.Parameter(i) for i in range(n_par)])
+    par_errs = np.array([f.ParError(i) for i in range(n_par)])
+    cov_matrix = f.GetCovarianceMatrix()
+    cov = np.array([[cov_matrix[i][j] for j in range(n_par)] for i in range(n_par)])
 
     # apply TF bin-by-bin to the fail histogram
     nbins_ratio = ratio.GetNbinsX()
@@ -144,16 +139,11 @@ for cat_name, cat_cfg in categories.items():
     qcd_TF_list = []
     qcd_TF_errs = []
     for cnt, err, x in zip(contents, errors, x_centers):
-        TF = p0 + p1 * x + p2 * x * x
+        # TF = sum_k p_k x^k, sigma_TF^2 = v^T cov v with v = (1, x, x^2, ...)
+        powers = x ** np.arange(n_par)
+        TF = pars @ powers
         qcd_val = cnt * TF
-        sigma_TF2 = (
-            p0_err**2 +
-            (x**2) * p1_err**2 +
-            (x**4) * p2_err**2 +
-            2 * x * cov_p0_p1 +
-            2 * (x**2) * cov_p0_p2 +
-            2 * (x**3) * cov_p1_p2
-        )
+        sigma_TF2 = powers @ cov @ powers
         sigma2 = (TF**2) * (err**2) + (cnt**2) * sigma_TF2
         qcd_err = np.sqrt(sigma2) if sigma2 > 0 else 0.0
         qcd_TF_list.append(qcd_val)
@@ -238,20 +228,42 @@ for cat_name, cat_cfg in categories.items():
         ftxt.write(f"Flavor: {flavor}\n")
         ftxt.write(f"Epsilon: {eps:.6f}\n")
         ftxt.write(f"Normalisation of fail * TF (pass / fail * TF outside the blinded window): {norm:.6f}\n")
-        ftxt.write(f"TF params: p0={p0:.6e} +/- {p0_err:.6e}, p1={p1:.6e} +/- {p1_err:.6e}, p2={p2:.6e} +/- {p2_err:.6e}\n")
+        ftxt.write(f"TF: {options.tf}\n")
+        par_strs = [f"p{i}={p:.6e} +/- {e:.6e}" for i, (p, e) in enumerate(zip(pars, par_errs))]
+        ftxt.write(f"TF params: {', '.join(par_strs)}\n")
         ftxt.write(f"QCD estimated (bins): {qcd_content}\n")
         ftxt.write(f"Errors in estimated QCD (bins): {qcd_errors}\n")
 
     file_TEMPLATES.Close()
 
-    # write qcd_estimated into the templates file, named like the other templates: qcd_{region}
-    fout = ROOT.TFile.Open(root_out_name, "UPDATE")
-    if fout and not fout.IsZombie():
-        qcd_TF_hist.SetName(f"qcd_{cat_name}")
-        qcd_TF_hist.Write("", ROOT.TObject.kOverwrite)
-        fout.Close()
-        print(f"Wrote qcd_{cat_name} to", root_out_name)
-    else:
-        print("Warning: couldn't open output root file", root_out_name)
+    # write qcd_estimated into the templates file, named like the other templates: qcd_{region}.
+    # With uproot, as the file was written by uproot: a ROOT "UPDATE" of it overwrites other objects in the file
+    # (uproot.from_pyroot fails with this ROOT, so the TH1 is rebuilt from its bins, flow bins and errors included)
+    n = qcd_TF_hist.GetNbinsX()
+    stats = np.zeros(4)
+    qcd_TF_hist.GetStats(stats)
+    qcd_th1 = uproot.writing.identify.to_TH1x(
+        fName=f"qcd_{cat_name}",
+        fTitle=qcd_TF_hist.GetTitle(),
+        data=np.array([qcd_TF_hist.GetBinContent(i) for i in range(n + 2)], dtype=np.float64),
+        fEntries=qcd_TF_hist.GetEntries(),
+        fTsumw=stats[0],
+        fTsumw2=stats[1],
+        fTsumwx=stats[2],
+        fTsumwx2=stats[3],
+        fSumw2=np.array([qcd_TF_hist.GetBinError(i) ** 2 for i in range(n + 2)], dtype=np.float64),
+        fXaxis=uproot.writing.identify.to_TAxis(
+            fName="xaxis", fTitle="", fNbins=n, fXmin=qcd_TF_hist.GetXaxis().GetXmin(), fXmax=qcd_TF_hist.GetXaxis().GetXmax()
+        ),
+    )
+    # The file is rewritten instead of uproot.update: deleting and rewriting a key with uproot.update can leave a
+    # duplicated end segment in the free list, after which uproot.update fails on the file (AssertionError)
+    with uproot.open(root_out_name) as fin:
+        hists = {k: fin[k] for k in fin.keys(cycle=False) if k != f"qcd_{cat_name}"}
+    hists[f"qcd_{cat_name}"] = qcd_th1
+    with uproot.recreate(root_out_name) as fout:
+        for k, h in hists.items():
+            fout[k] = h
+    print(f"Wrote qcd_{cat_name} to", root_out_name)
 
 print(f"\nAll {flavor} categories processed.")

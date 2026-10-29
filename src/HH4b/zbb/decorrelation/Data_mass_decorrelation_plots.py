@@ -95,6 +95,8 @@ NANOTREES_MIN_TXBB = 0.0
 NANOTREES_SELECTION = {**nanotrees_loader.DEFAULT_SELECTION, "txbb_lead": NANOTREES_MIN_TXBB}
 
 REPROCESS = False
+# take the ratios to the inclusive TXbb shape (txbb_regions[0]) instead of the first TXbb region (txbb_regions[1])
+RATIO_TO_INCLUSIVE = True
 # parallel processes reading the data files (each holds a ~500 MB chunk of branches, a few GB at its peak)
 N_WORKERS = 6
 
@@ -650,7 +652,8 @@ def main():
         # (0.4, 1.0),
         (0.4, 0.75),
         (0.75, 0.93),
-        (0.93, 1.0),
+        (0.93, 0.96),
+        (0.96,1.0)
         # (0.92, 1.0),
         #(0.94, 1.0),
         #(0.96, 1.0),
@@ -664,26 +667,21 @@ def main():
 
     # VHcc analysis low/high pT regions, now check more granular pT regions
     pt_regions = [
-        (170,225),
-        #(200, 225),
-        (225, 250),
-        (250,275),
-        (275, 300),
+       # (170,225),
+       # (225, 250),
+       # (250,275),
+       # (275, 300),
+        #(300,350),
        # (300,325),
        # (325, 350),
-        #(350, 375),
-        (300,350),
-        (350,500),
-       # (375, 400),
-       # (400, 500),
-        (500,1300 ),
-        # (170, 275),
-        # (275,300),
-        # (300,325),
-        # (275, 325),
-        # (325, 375),
-        # (375, 500),
-        # (500, 1300)
+        (350,400),
+        (400,450),
+        (450,500),
+        #(500,1300 ),
+        (500,550),
+        (550,600),
+        (600,900),
+        (900,13000)
     ]
 
     # oringinal scouting Zbb analysis pT regions
@@ -725,10 +723,11 @@ def main():
         print(f"{key}: {region_data['total_events']} events")
     
     print("Creating plots...")
+    ref_region = txbb_regions[0] if RATIO_TO_INCLUSIVE else txbb_regions[1]
     for pt_region in pt_regions:
         fig = compare_shapes_in_pt_region(
-            aggregate_dict, 
-            reference_key = f"TXbb = [{txbb_regions[1][0]}, {txbb_regions[1][1]}], pT = [{pt_region[0]}, {pt_region[1]}]",
+            aggregate_dict,
+            reference_key = f"TXbb = [{ref_region[0]}, {ref_region[1]}], pT = [{pt_region[0]}, {pt_region[1]}]",
             pt_region = pt_region
             )
         fig.savefig(f"{RESULTS_DIR}/pT{pt_region[0]}to{pt_region[1]}_{filename_suffix}_{mass_variable}.pdf")

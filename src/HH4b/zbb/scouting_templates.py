@@ -27,6 +27,7 @@ NANOTREES_FILES = {
     "ttbar": "mc/skim/ttbar_tree.root",
     "QCD": "mc/skim/qcd*_tree.root",
     "singletop": "mc/skim/singletop_tree.root",
+    "hbb": "mc/skim/*h2bb_tree.root",  # ggH, ggZH, WH (W to lnu, qq) and ZH, H to bb
 }
 # processes reading the NanoTrees files of a sample in parallel (each holds a ~500 MB chunk, a few GB at its peak)
 NANOTREES_N_WORKERS = 6
@@ -45,11 +46,11 @@ if INPUT_FORMAT == "nanotrees":
     tag = f"nanotrees_{Path(NANOTREES_DIR).name}_{SELECTION}"
 
 # Pass and fail regions
-txbb_bins = [0.93, 1.0] #0.75 #0.93
+txbb_bins = [0.75, 0.93, 1.0] #0.75 #0.93
 min_txbb = txbb_bins[0]
 # pT bins
 #pt_bins = [170, 225, 250, 275, 300, 350, 500, 900, 1300]
-pt_bins = [170, 350, 450, 550, 1300]
+pt_bins = [170, 250, 350, 400, 450, 500, 550, 600, 900, 10000]
 
 txbb_bins = list(zip(txbb_bins[:-1], txbb_bins[1:]))
 pt_bins = list(zip(pt_bins[:-1], pt_bins[1:]))
@@ -140,6 +141,8 @@ SAMPLES_DICT = {
     "singletop": ["singletop"],
     "Zto2Q": ["Zto2Q-4Jets"],
     "Wto2Q": ["Wto2Q-3Jets"],
+    # "hbb", the key of the H to bb colour and label in plotting.py
+    "hbb": ["ggh-h2bb", "ggzh-z2qq-h2bb", "wh-w2ln-h2bb", "wh-w2qq-h2bb", "zh-z2qq-h2bb"],
 }
 MC_SAMPLES_LIST = [sample for sample in SAMPLES_DICT.keys() if sample != "data"]
 
@@ -210,7 +213,7 @@ extra_columns_dict = {
     "QCD": load_weight_shifts,
     "ttbar": MC_common_extra_columns,
     "singletop": MC_common_extra_columns,
-    # "hbb": MC_common_extra_columns, # Don't have hbb samples
+    "hbb": MC_common_extra_columns,
     "Zto2Q": MC_common_extra_columns + ZQQ_extra_columns,
     "Wto2Q": MC_common_extra_columns + WQQ_extra_columns,
 }
@@ -500,7 +503,9 @@ def apply_jmsr_smearing_in_templates(
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Zto2Q_unmatched", "Wto2Q", "ttbar", "qcd"]
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar", "qcd"]
 bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar", "singletop", "QCD"]
-sig_keys = []
+# H to bb is plotted as an unstacked step histogram, scaled by SIG_SCALE in the pass regions
+sig_keys = ["hbb"]
+SIG_SCALE = 50
 bg_order = list(reversed(bkg_keys))
 
 jshift_keys = [""]
@@ -519,7 +524,10 @@ weight_shifts = {
     "pileup": postprocessing.Syst(
         samples=MC_SAMPLES_FINAL_LIST, label="Pileup", years=list(YEARS_COMBINED_DICT.keys())
     ),
-    "pdf": postprocessing.Syst(samples=sig_keys, label="PDFAcc", years=list(YEARS_COMBINED_DICT.keys())),
+    # the NanoTrees have no PDF weights
+    "pdf": postprocessing.Syst(
+        samples=sig_keys if INPUT_FORMAT == "skimmer" else [], label="PDFAcc", years=list(YEARS_COMBINED_DICT.keys())
+    ),
     "ISRPartonShower": postprocessing.Syst(
         samples=MC_SAMPLES_FINAL_LIST,
         label="ISR Parton Shower",
@@ -566,8 +574,11 @@ for year in YEARS_COMBINED_DICT:
         df = events[sample_name]
         if "weight" in df.columns.get_level_values(0):
             del df["weight"]
-        events[sample_name] = df.iloc[np.argsort(df[("bbFatJetPt", 0)].to_numpy(), kind="stable")]
-        del df
+        # sorted one column at a time, popping each from the unsorted frame, so that the peak is the sample plus one
+        # column (iloc with the sort order held a full second copy of the sample)
+        order = np.argsort(df[("bbFatJetPt", 0)].to_numpy(), kind="stable")
+        events[sample_name] = pd.DataFrame({col: df.pop(col).to_numpy()[order] for col in list(df.columns)}, copy=False)
+        del df, order
 
     # smear once per year: it modifies the nominal mass in place, so inside the pT bin loop it compounded per bin
     for sample_name, df in events.items():
@@ -685,6 +696,7 @@ for year in YEARS_COMBINED_DICT:
                 year=year,
                 sig_keys=sig_keys,
                 plot_sig_keys=sig_keys,
+                sig_scale_dict={key: SIG_SCALE for key in sig_keys},
                 selection_regions=selection_regions,
                 shape_vars=[fit_shape_var],
                 systematics={},

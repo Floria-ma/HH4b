@@ -22,6 +22,12 @@ DATA_KEY = "data"
 BG_ORDER = [QCD_KEY, "Wto2Q", "Zto2Q_QQ", "Zto2Q_CC", "ttbar", "singletop", "Zto2Q_BB"]  # bottom to top of the stack
 BLIND_WINDOW = (100, 150)  # BLIND_WINDOW of scouting_templates.py, data hidden there
 MASS_LABEL = r"$m_\mathrm{res}$ (GeV)"
+# sig_keys of scouting_templates.py, plotted unstacked (step) and scaled by SIG_SCALE
+SIG_KEYS = ["hbb"]
+SIG_SCALE = 50
+# samples with their yield in the legend
+ZBB_KEY = "Zto2Q_BB"
+YIELD_LABELS = {key: plotting.label_by_sample.get(key, key) for key in [*SIG_KEYS, ZBB_KEY]}
 
 
 def region_hist(f, region: str, mc_keys: list[str]) -> Hist:
@@ -77,12 +83,21 @@ def main():
         for region in regions:
             # templates of an older scouting_templates.py run can miss a sample (e.g. singletop)
             mc_keys = [key for key in MC_KEYS if f"{key}_{region}" in names]
-            if missing := set(MC_KEYS) - set(mc_keys):
+            sig_keys = [key for key in SIG_KEYS if f"{key}_{region}" in names]
+            if missing := set(MC_KEYS + SIG_KEYS) - set(mc_keys + sig_keys):
                 print(f"Warning: no {sorted(missing)} templates for {region} in {fname}, plotting without them")
+            hists = region_hist(f, region, mc_keys + sig_keys)
+            # signal (before the SIG_SCALE scaling) and Zbb yields in the legend (ratioHistPlot takes the labels
+            # from label_by_sample)
+            for key in [k for k in YIELD_LABELS if k in sig_keys or k in mc_keys]:
+                n = hists[key, :].sum().value
+                plotting.label_by_sample[key] = f"{YIELD_LABELS[key]} ({n:.1f} events)"
+                print(f"  {region} {key}: {n:.1f} events")
             plotting.ratioHistPlot(
-                hists=region_hist(f, region, mc_keys),
+                hists=hists,
                 year=args.year,
-                sig_keys=[],
+                sig_keys=sig_keys,
+                sig_scale_dict={key: SIG_SCALE for key in sig_keys},
                 bg_keys=[*mc_keys, QCD_KEY],
                 bg_order=[key for key in BG_ORDER if key in [*mc_keys, QCD_KEY]],
                 title=f"{region} Region Pre-Fit Shapes",

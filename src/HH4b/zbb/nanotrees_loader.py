@@ -68,6 +68,9 @@ MC_WEIGHT_BRANCHES = [
 
 # scouting Zbb selection of bbbbSkimmer. The cuts below it are off by default (None)
 DEFAULT_SELECTION = {
+    # probe ("lead") jet, the first one of the outputs: "txbb" the highest-TXbb jet, "pt" the leading-pT jet.
+    # The "lead"/"lower-TXbb" cuts below are on the probe and the other jet
+    "sort_by": "pt",
     "pt_lead": 0,  # highest-TXbb jet
     "txbb_lead": 0,  # highest-TXbb jet
     "pt_subl": 0,  # both jets
@@ -75,10 +78,12 @@ DEFAULT_SELECTION = {
     "ht": 0,  # NanoTrees ht sums all scouting AK4 jets, the skimmer only the good_ak4jets
     "met": None,  # needs the met branch, which the skims of skim_nanotrees.py do not keep
     "mreg": (40, 200),  # (min, max) regressed mass of both jets
-    "msd": (30, 190),  # (min, max) soft drop mass of both jets
+    "msd": None,  # (min, max) soft drop mass of both jets
     "msd_mreg_ratio": None,  # (min, max) of (msd + msd_mreg_shift) / regressed mass, for both jets
     # shift of the msd in msd_mreg_ratio: one value for both jets, or (highest-TXbb jet, other jet)
     "msd_mreg_shift": 10.0,
+    # max VVsQCD of the lower-TXbb jet, against the VH had Hbb/Hcc signal regions (V jet VVsQCD > 0.7)
+    "recoil_vvsqcd": None,
 }
 
 # common_selections of the VH had channel (PlotTools/VH/cards/rDataframeScripts/vh_had.py), with the highest-TXbb
@@ -86,6 +91,7 @@ DEFAULT_SELECTION = {
 # preselection
 VH_HAD_SELECTION = {
     **DEFAULT_SELECTION,
+    "sort_by": "txbb",
     "pt_lead": 200,
     "txbb_lead": 0.0,
     "pt_subl": 0,
@@ -95,6 +101,13 @@ VH_HAD_SELECTION = {
     "msd": (30, 190),
     "msd_mreg_ratio": (0.8, 1.2),
     "msd_mreg_shift": (15.0, 10.0),  # H, V candidate
+    "recoil_vvsqcd": None,
+}
+
+# NanoTrees branches of the recoil_vvsqcd cut, read only if it is on
+VVSQCD_BRANCHES = {
+    "WVsQCD": ("ak8_ParT_WVsQCD", "ak8_2_ParT_WVsQCD"),
+    "ZVsQCD": ("ak8_ParT_ZVsQCD", "ak8_2_ParT_ZVsQCD"),
 }
 
 # same as bbFatJetVQQMatch in GenSelection.py: both V daughters within dR < 0.8 of the jet
@@ -133,9 +146,12 @@ def _select_chunk(
     jets = {col: (_to_np(arrays, b0), _to_np(arrays, b1)) for col, (b0, b1) in _jet_branches(jet_columns).items()}
 
     # order the two jets by TXbb like the bbFatJets in the skimmer. Same as a descending argsort,
-    # i.e. the subleading-pT jet first on ties or if its TXbb is NaN
+    # i.e. the subleading-pT jet first on ties or if its TXbb is NaN. The NanoTrees jets are already pT-ordered
     txbb0, txbb1 = jets["bbFatJetScoutParTTXbb"]
-    swap = np.isnan(txbb1) | (txbb1 >= txbb0)
+    if cuts["sort_by"] == "txbb":
+        swap = np.isnan(txbb1) | (txbb1 >= txbb0)
+    else:
+        swap = np.zeros(len(txbb0), dtype=bool)
 
     pt0, pt1 = jets["bbFatJetPt"]
     sel = (
@@ -152,6 +168,12 @@ def _select_chunk(
     msd = jets["bbFatJetMsd"]
     if cuts.get("met") is not None:
         sel = sel & (_to_np(arrays, "met") < cuts["met"])
+    if cuts.get("recoil_vvsqcd") is not None:
+        # the lower-TXbb jet is jet 0 (leading pT) if swap. VVsQCD as in the VH had channel (plotShapesMultiTags.py)
+        recoil = {
+            name: np.where(swap, _to_np(arrays, b0), _to_np(arrays, b1)) for name, (b0, b1) in VVSQCD_BRANCHES.items()
+        }
+        sel = sel & ((recoil["WVsQCD"] + 0.67 * recoil["ZVsQCD"]) / 1.67 < cuts["recoil_vvsqcd"])
     shift_tagged, shift_other = np.broadcast_to(cuts["msd_mreg_shift"], 2)
     for jet in (0, 1):
         # jet 1 (subleading pT) is the highest-TXbb jet if swap
@@ -270,6 +292,8 @@ def iterate_nanotrees(
     branches = read_branches(sample, jet_columns)
     if cuts.get("met") is not None:
         branches = [*branches, "met"]
+    if cuts.get("recoil_vvsqcd") is not None:
+        branches = [*branches, *(b for pair in VVSQCD_BRANCHES.values() for b in pair)]
 
     if verbose:
         print(f"Loading {sample} from {len(files)} NanoTrees file(s)")
