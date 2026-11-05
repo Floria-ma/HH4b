@@ -2,16 +2,16 @@
     "2024": {
         "Data": {
             "subsamples": [
-                "Run2024C", # test era first, then enable the rest
-                # "Run2024D",
-                # "Run2024E",
-                # "Run2024F",
-                # "Run2024G",
-                # "Run2024H",
-                # "Run2024I",
-                # Run2024B has no files in /ScoutingPFRun3/Run2024B-ScoutNano-v1/NANOAOD
+                # Run2024B has no files in data/nanoindex_v15_scouting.json
+                "Run2024C",
+                "Run2024D",
+                "Run2024E",
+                "Run2024F",
+                "Run2024G",
+                "Run2024H",
+                "Run2024I"
             ],
-            "files_per_job": 1
+            "files_per_job": 5
         },
         "VJetsLO": {
             "subsamples": [
@@ -26,7 +26,7 @@
                 "Wto2Q-3Jets_Bin-HT-400to800",
                 "Wto2Q-3Jets_Bin-HT-800to1500",
                 "Wto2Q-3Jets_Bin-HT-1500to2500",
-                "Wto2Q-3Jets_Bin-HT-2500",
+                "Wto2Q-3Jets_Bin-HT-2500"
             ],
             "files_per_job": 5,
             "chunksize": 8000
@@ -40,21 +40,21 @@
             "files_per_job": 5,
             "chunksize": 8000
         },
-        # QCD MC is not used in the templates (QCD is taken from data), so it is off by default
-         "QCD": {
-             "subsamples": [
-                 "QCD-4Jets_Bin-HT-100to200",
-                 "QCD-4Jets_Bin-HT-200to400",
-                 "QCD-4Jets_Bin-HT-400to600",
-                 "QCD-4Jets_Bin-HT-600to800",
-                 "QCD-4Jets_Bin-HT-800to1000",
-                 "QCD-4Jets_Bin-HT-1000to1200",
-                 "QCD-4Jets_Bin-HT-1200to1500",
-                 "QCD-4Jets_Bin-HT-1500to2000",
-                 "QCD-4Jets_Bin-HT-2000"
-             ],
-             "files_per_job": 5,
-             "chunksize": 8000
-         }
-     },
+        # QCD MC is not used in the templates (QCD is taken from data)
+        "QCD": {
+            "subsamples": [
+                "QCD-4Jets_Bin-HT-100to200",
+                "QCD-4Jets_Bin-HT-200to400",
+                "QCD-4Jets_Bin-HT-400to600",
+                "QCD-4Jets_Bin-HT-600to800",
+                "QCD-4Jets_Bin-HT-800to1000",
+                "QCD-4Jets_Bin-HT-1000to1200",
+                "QCD-4Jets_Bin-HT-1200to1500",
+                "QCD-4Jets_Bin-HT-1500to2000",
+                "QCD-4Jets_Bin-HT-2000"
+            ],
+            "files_per_job": 5,
+            "chunksize": 8000
+        },
+    },
 }

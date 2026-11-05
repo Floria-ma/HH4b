@@ -10,57 +10,23 @@ import correctionlib
 from collections import OrderedDict
 import uproot
 
-import nanotrees_loader
-
-# Input ntuples: "skimmer" reads the bbbbSkimmer parquet in DATA_DIR, "nanotrees" the VH NanoTrees "had" trees in NANOTREES_DIR
-INPUT_FORMAT = "nanotrees"
-NANOTREES_DIR = "/eos/user/z/zima/HadronicVH/tagger_Cali_2024_had"
-# Luminosity (fb^-1) to normalise the NanoTrees MC to. None keeps the full-2024 lumiwgt of the trees,
-# so set this to the lumi of the data eras in NANOTREES_DIR (test_2024_had has Run2024C+D only)
-NANOTREES_MC_LUMI = None
-# Files of each sample relative to NANOTREES_DIR, overriding nanotrees_loader.SAMPLE_FILES. tagger_Cali_2024_had
-# has no merged trees, only the skim_nanotrees.py skims (as in QCD/Data_mass_decorrelation_plots.py)
-NANOTREES_FILES = {
-    "data": "data/skim/*/ScoutingPFRun3_tree_*.root",
-    "Zto2Q": "mc/skim/z2qq_tree.root",
-    "Wto2Q": "mc/skim/w2qq_tree.root",
-    "ttbar": "mc/skim/ttbar_tree.root",
-    "QCD": "mc/skim/qcd*_tree.root",
-    "singletop": "mc/skim/singletop_tree.root",
-    "hbb": "mc/skim/*h2bb_tree.root",  # ggH, ggZH, WH (W to lnu, qq) and ZH, H to bb
-}
-# processes reading the NanoTrees files of a sample in parallel (each holds a ~500 MB chunk, a few GB at its peak)
-NANOTREES_N_WORKERS = 6
-
-# NanoTrees event selection: "zbb" the scouting Zbb one of bbbbSkimmer, "vh" the VH had channel one
-SELECTION = "zbb"
-NANOTREES_SELECTIONS = {
-    "zbb": nanotrees_loader.DEFAULT_SELECTION,
-    "vh": nanotrees_loader.VH_HAD_SELECTION,
-}
-# the VH had channel weights its MC with the trigger SFs instead of an HT cut on the trigger plateau
-NANOTREES_APPLY_TRIG_SF = SELECTION == "zbb"
-
 tag = "14Feb2026_VJets_TT_Only_v15_scouting_zbb" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
-if INPUT_FORMAT == "nanotrees":
-    tag = f"nanotrees_{Path(NANOTREES_DIR).name}_{SELECTION}"
 
 # Pass and fail regions
-txbb_bins = [0.75, 0.93, 1.0] #0.75 #0.93
+txbb_bins = [0.96, 1.0]
 min_txbb = txbb_bins[0]
 # pT bins
-#pt_bins = [170, 225, 250, 275, 300, 350, 500, 900, 1300]
-pt_bins = [170, 250, 350, 400, 450, 500, 550, 600, 900, 10000]
+pt_bins = [350, 450, 550, 1800]
 
 txbb_bins = list(zip(txbb_bins[:-1], txbb_bins[1:]))
 pt_bins = list(zip(pt_bins[:-1], pt_bins[1:]))
 
 # Mass bins
-m_low, m_high = 30, 200
+m_low, m_high = 40, 180
 bin_width = 5
 n_mass_bins = int((m_high - m_low) / bin_width)
 
-STORAGE_PROJ_DIR = Path("/eos/user/z/zima/bbbb/")
+STORAGE_PROJ_DIR = Path("/eos/user/e/eheikkil/bbbb/")
 DATA_DIR = STORAGE_PROJ_DIR / f"skimmer/{tag}"
 PROCESSED_DIR = STORAGE_PROJ_DIR / f"scouting/templates/{tag}"
 # PROCESSED_DIR = Path("processed")
@@ -71,38 +37,26 @@ APPLY_Z_RECOIL_CORR: bool = False # if True, apply the Z->2Q recoil corrections 
 DO_JESR: bool = False # can't
 DO_JMSR: bool = True
 tagger_branch = "bbFatJetScoutParTTXbb"
-# Regressed mass to fit. The NanoTrees only have the resonance mass, skimmer outputs also "bbFatJetScoutParTmassCorrectedX2p"
-MASS_VAR = "bbFatJetScoutParTmassCorrResonance"
-MASS_LABEL = r"$m_\mathrm{res}$ (GeV)"
-# H signal region of the VH analysis, whose selection these events share: data is zeroed there in the pass regions
-# (templates and plots). The QCD estimate and the fit have to skip these bins
-BLIND_WINDOW = [100, 150]
-# fail region of the QCD estimate (qcd_estimation.py): the fail TXbb range with this lower bound. The "fail" region of
-# the fit (TXbb from 0) is kept as is
-QCD_FAIL_TXBB_MIN = 0.4
-QCD_FAIL_REGION = f"fail_TXbb{str(QCD_FAIL_TXBB_MIN).replace('.', 'p')}to{str(min(0.9, min_txbb)).replace('.', 'p')}"
 
 
 YEARS = [
-    # "2022",
-    # "2022EE",
-    # "2023",
-    # "2023BPix",
+    # "2022", 
+    # "2022EE", 
+     "2023", 
+    "2023BPix",
     "2024"
     ]
 YEARS_COMBINED_DICT = {
     # "2022All": [
-    #         "2022",
+    #         "2022", 
     #         "2022EE"
     #         ],
-    # "2023All": [
-    #         "2023",
-    #         "2023BPix"
-    #         ],
-    "2024All": ["2024"]
+     "2023All": [
+             "2023", 
+            "2023BPix"
+             ],
+    "2024": ["2024"]
 }
-# ZMuMu GenZPt correction applied to each combined year. None has been derived for 2024 yet, so 2024 reuses 2023
-Z_RECOIL_CORR_YEAR = {"2022All": "2022", "2023All": "2023", "2024All": "2023"}
 RUNS = {
     "2023": ["Run2023C"],
     "2023BPix": ["Run2023D"],
@@ -134,15 +88,10 @@ SAMPLES_DICT = {
         "Run2024H",
         "Run2024I"
     ],
-    # QCD MC, only to compare with the QCD estimated from data (qcd_estimation.py writes that one as "qcd").
-    # Named "QCD" so that its templates QCD_{region} don't clash with the estimate's qcd_{region}
-    "QCD": ["QCD"],
+    # QCD from data in CR
     "ttbar": ["TTto4Q", "TTtoLNu2Q", "TTto2L2Nu"],
-    "singletop": ["singletop"],
     "Zto2Q": ["Zto2Q-4Jets"],
     "Wto2Q": ["Wto2Q-3Jets"],
-    # "hbb", the key of the H to bb colour and label in plotting.py
-    "hbb": ["ggh-h2bb", "ggzh-z2qq-h2bb", "wh-w2ln-h2bb", "wh-w2qq-h2bb", "zh-z2qq-h2bb"],
 }
 MC_SAMPLES_LIST = [sample for sample in SAMPLES_DICT.keys() if sample != "data"]
 
@@ -167,7 +116,9 @@ mass_vars = [
     "bbFatJetMsd",
 ]
 scoutpart_mass_vars = [
-    MASS_VAR,
+    "bbFatJetScoutParTmassCorrectedX2p",
+    "bbFatJetScoutParTmassGeneric",
+    "bbFatJetScoutParTmassCorrResonance"
 ]
 
 scoutpart_txbbb_vars = [
@@ -210,10 +161,9 @@ WQQ_extra_columns = [("GenWPt", 1), ("GenWCS", 1), ("GenWUD", 1), ("bbFatJetVQQM
 
 extra_columns_dict = {
     "data": [],
-    "QCD": load_weight_shifts,
+    # "qcd": load_weight_shifts, # Don't bother loading QCD, just a waste of time since it is estimted from data anyway
     "ttbar": MC_common_extra_columns,
-    "singletop": MC_common_extra_columns,
-    "hbb": MC_common_extra_columns,
+    # "hbb": MC_common_extra_columns, # Don't have hbb samples
     "Zto2Q": MC_common_extra_columns + ZQQ_extra_columns,
     "Wto2Q": MC_common_extra_columns + WQQ_extra_columns,
 }
@@ -223,7 +173,7 @@ if APPLY_Z_RECOIL_CORR:
     corr_dir = Path("ZMuMu_corrs")
     corr_dict = {}
 
-    for year in ["2022", "2023"]:
+    for year in ["2022", "2023", "2024"]:
         corr_file = corr_dir / f"corr_{year}.json"
         if not corr_file.exists():
             raise FileNotFoundError(f"Correction file {corr_file} does not exist.")
@@ -241,10 +191,6 @@ def get_era_path(year):
     return PROCESSED_DIR / f"Zbb_events_{year}.pkl"
 
 def get_combined_path(combined_year):
-    # a combined year of a single era is that era's file, instead of a second copy of it
-    year_list = YEARS_COMBINED_DICT[combined_year]
-    if len(year_list) == 1:
-        return get_era_path(year_list[0])
     return PROCESSED_DIR / f"Zbb_events_{combined_year}.pkl"
 
 
@@ -281,45 +227,36 @@ else:
                 print(f"Loading {sample} for {year}...")
 
                 columns = base_columns + extra_columns_dict.get(sample, [])
-                if INPUT_FORMAT == "nanotrees":
-                    dataframes = nanotrees_loader.load_nanotrees(
-                        NANOTREES_DIR,
-                        [sample],
-                        selection=NANOTREES_SELECTIONS[SELECTION],
-                        apply_trig_sf=NANOTREES_APPLY_TRIG_SF,
-                        jmsr_vars=mass_vars if DO_JMSR else [],
-                        mc_lumi=NANOTREES_MC_LUMI,
-                        file_patterns=NANOTREES_FILES,
-                        # the templates only use the highest-TXbb jet: its pT, TXbb and mass (and the mass_vars
-                        # for the MC JMS/JMR variations). Keeping only these is what fits data (~2x10^8 events) in memory
-                        jet_columns={
-                            s: [tagger_branch, "bbFatJetPt", MASS_VAR] + ([] if s == "data" else mass_vars)
-                            for s in SAMPLES_DICT
-                        },
-                        first_jet_only=list(SAMPLES_DICT),
-                        n_workers=NANOTREES_N_WORKERS,
+                dataframes = {
+                    **utils.load_samples(
+                        data_dir=str(DATA_DIR),
+                        samples={sample: sample_list},
+                        year=year,
+                        columns=utils.format_columns(columns),
+                        variations=True,
+                        weight_shifts=weight_shifts,
                     )
-                else:
-                    dataframes = {
-                        **utils.load_samples(
-                            data_dir=str(DATA_DIR),
-                            samples={sample: sample_list},
-                            year=year,
-                            columns=utils.format_columns(columns),
-                            variations=True,
-                            weight_shifts=weight_shifts,
-                        )
-                    }
+                }
 
                 # Process and concatenate dataframes for this sample
-                # the pT and mass variations missing in a sample (e.g. data) are added per pT bin below, as copies
-                # of the nominal for the events of that bin only
-                sample_dfs = list(dataframes.values())
+                sample_dfs = []
+                for key, df in dataframes.items():
+                    # Handle pT variations
+                    for pt_var in ["bbFatJetPt"] + pt_variations:
+                        if pt_var not in df.columns:
+                            for i in range(2):
+                                df[f"{pt_var}{i}"] = df[("bbFatJetPt", i)].copy()
 
-                # Concatenate all dataframes for this sample (concat would copy a single one too)
-                events_era[sample] = (
-                    sample_dfs[0] if len(sample_dfs) == 1 else pd.concat(sample_dfs, ignore_index=True)
-                )
+                    # Handle mass variations
+                    for mass_var in mass_vars + mass_variations:
+                        if mass_var not in df.columns:
+                            for i in range(2):
+                                df[f"{mass_var}{i}"] = df[(mass_var.split("_")[0], i)].copy()
+
+                    sample_dfs.append(df)
+
+                # Concatenate all dataframes for this sample
+                events_era[sample] = pd.concat(sample_dfs, ignore_index=True)
                 print(f"  {sample}: {len(events_era[sample])} events")
 
                 # Clear intermediate dataframes to free memory
@@ -346,12 +283,7 @@ else:
     for combined_year, year_list in YEARS_COMBINED_DICT.items():
         combined_path = get_combined_path(combined_year)
 
-        if len(year_list) == 1:
-            # nothing to combine, the era file written above is the combined year
-            print(f"\nLoading {combined_year} from {combined_path}...")
-            with combined_path.open("rb") as f:
-                events_combined[combined_year] = pd.read_pickle(f)
-        elif REPROCESS or not combined_path.exists():
+        if REPROCESS or not combined_path.exists():
             print(f"\nCombining eras for {combined_year}: {year_list}")
 
             # Load each era
@@ -400,7 +332,7 @@ if APPLY_Z_RECOIL_CORR:
     print("Applying Zto2Q corrections...")
     for year in YEARS_COMBINED_DICT.keys():
         # apply corrections to the events
-        corr = corr_dict[Z_RECOIL_CORR_YEAR[year]]["GenZPtWeight"]
+        corr = corr_dict[year.replace("All", "")]["GenZPtWeight"]
         GenZ_pt = events_combined[year]["Zto2Q"]["GenZPt"].values[:, 0]
         sf_nom = corr.evaluate(GenZ_pt, "nominal")
         sf_up = corr.evaluate(GenZ_pt, "stat_up")
@@ -434,10 +366,9 @@ for year in YEARS_COMBINED_DICT.keys():
     ZtoCC = is_ZCC & matched
     ZtoQQ = is_ZQQ & matched
     Z_unmatched = ~matched
-    # explicit copies, the JMS/JMR smearing below writes to them
-    events_combined[year]["Zto2Q_BB"] = Zto2Q[ZtoBB].copy()
-    events_combined[year]["Zto2Q_CC"] = Zto2Q[ZtoCC].copy()
-    events_combined[year]["Zto2Q_QQ"] = Zto2Q[ZtoQQ].copy()
+    events_combined[year]["Zto2Q_BB"] = Zto2Q[ZtoBB]
+    events_combined[year]["Zto2Q_CC"] = Zto2Q[ZtoCC]
+    events_combined[year]["Zto2Q_QQ"] = Zto2Q[ZtoQQ]
     # leave the unmatched to bkg fits
     # events_combined[year]["Zto2Q_unmatched"] = Zto2Q[Z_unmatched]
 
@@ -502,10 +433,8 @@ def apply_jmsr_smearing_in_templates(
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Zto2Q_unmatched", "Wto2Q", "hbb", "ttbar", "qcd"]
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Zto2Q_unmatched", "Wto2Q", "ttbar", "qcd"]
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar", "qcd"]
-bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar", "singletop", "QCD"]
-# H to bb is plotted as an unstacked step histogram, scaled by SIG_SCALE in the pass regions
-sig_keys = ["hbb"]
-SIG_SCALE = 50
+bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar"]
+sig_keys = []
 bg_order = list(reversed(bkg_keys))
 
 jshift_keys = [""]
@@ -524,10 +453,7 @@ weight_shifts = {
     "pileup": postprocessing.Syst(
         samples=MC_SAMPLES_FINAL_LIST, label="Pileup", years=list(YEARS_COMBINED_DICT.keys())
     ),
-    # the NanoTrees have no PDF weights
-    "pdf": postprocessing.Syst(
-        samples=sig_keys if INPUT_FORMAT == "skimmer" else [], label="PDFAcc", years=list(YEARS_COMBINED_DICT.keys())
-    ),
+    "pdf": postprocessing.Syst(samples=sig_keys, label="PDFAcc", years=list(YEARS_COMBINED_DICT.keys())),
     "ISRPartonShower": postprocessing.Syst(
         samples=MC_SAMPLES_FINAL_LIST,
         label="ISR Parton Shower",
@@ -560,66 +486,16 @@ if APPLY_Z_RECOIL_CORR:
     )
 
 for year in YEARS_COMBINED_DICT:
-    out_dir = Path(f"/eos/user/z/zima/scouting/templates/{tag}/")
+    out_dir = Path(f"/eos/user/e/eheikkil/scouting/templates/{tag}/")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     template_dir = out_dir
     template_dir.mkdir(parents=True, exist_ok=True)
 
-    events = events_combined[year]
-
-    # memory (~2x10^8 data events): the templates weight with finalWeight, so drop its copy "weight", and sort each
-    # sample by pT so that each pT bin below is a slice of the rows (a view) instead of a copy
-    for sample_name in list(events):
-        df = events[sample_name]
-        if "weight" in df.columns.get_level_values(0):
-            del df["weight"]
-        # sorted one column at a time, popping each from the unsorted frame, so that the peak is the sample plus one
-        # column (iloc with the sort order held a full second copy of the sample)
-        order = np.argsort(df[("bbFatJetPt", 0)].to_numpy(), kind="stable")
-        events[sample_name] = pd.DataFrame({col: df.pop(col).to_numpy()[order] for col in list(df.columns)}, copy=False)
-        del df, order
-
-    # smear once per year: it modifies the nominal mass in place, so inside the pT bin loop it compounded per bin
-    for sample_name, df in events.items():
-        if sample_name != "data":
-            print(sample_name)
-            apply_jmsr_smearing_in_templates(
-                    df,
-                    mass_branch_base=MASS_VAR,
-                    jet_index=0,
-                    seed=42,
-                    jms_vals=(0.9, 1.0, 1.1), # these are in nonsensical order right now, change to work with dict
-                    jmr_vals=(1.1, 1.0, 1.2)
-                )
-
     for pt_low, pt_high in pt_bins:
         pt_low_str = str(pt_low)
         pt_high_str = str(pt_high)
         pt_bin_key = f"pT{pt_low_str}to{pt_high_str}"
-
-        # the events of this pT bin, so that the selections of each region and JMS/JMR shift do not run over all
-        # events. Same cut as the pT cut of the regions (low <= pT < high); only valid without the JES/JER pT shifts
-        assert not DO_JESR, "the pT bin slicing does not account for the JES/JER shifts of the pT"
-        events_bin = {}
-        for sample_name, df in events.items():
-            # the events are sorted by pT (NaN last), so low <= pT < high is a slice
-            pt = df[("bbFatJetPt", 0)].to_numpy()
-            i_low, i_high = np.searchsorted(pt, [pt_low, pt_high], side="left")
-            df = df.iloc[i_low:i_high]
-
-            # the selections and shapes of each jshift use the shifted variable for every sample, so the samples
-            # without the variations (data) get copies of the nominal. New columns of the slice only, so the
-            # chained assignment warning does not apply
-            with pd.option_context("mode.chained_assignment", None):
-                for pt_var in pt_variations:
-                    if pt_var not in df.columns:
-                        df[f"{pt_var}0"] = df[("bbFatJetPt", 0)]
-                for mass_var in mass_variations:
-                    if mass_var.startswith(MASS_VAR) and mass_var not in df.columns:
-                        df[f"{mass_var}0"] = df[(MASS_VAR, 0)]
-
-            events_bin[sample_name] = df
 
         cutflows_dir = Path(f"{out_dir}/cutflows/{year}")
         cutflows_dir.mkdir(parents=True, exist_ok=True)
@@ -629,14 +505,41 @@ for year in YEARS_COMBINED_DICT:
 
         templates = {}
 
+        events = events_combined[year]
+
+        for sample_name, df in events.items():
+            if sample_name != "data":
+                print(sample_name)
+                apply_jmsr_smearing_in_templates(
+                        df,
+                        mass_branch_base= "bbFatJetScoutParTmassCorrectedX2p", #"bbFatJetParT3massCorrectedX2p",
+                        jet_index=0,
+                        seed=42,
+                        jms_vals=(0.9, 1.0, 1.1), # these are in nonsensical order right now, change to work with dict
+                        jmr_vals=(1.1, 1.0, 1.2)
+                    )
+
         # Determine the pt and mass variations
         for jshift in jshift_keys:
             pt_branch = "bbFatJetPt0"
-            mass_branch = f"{MASS_VAR}0"
-            if jshift.startswith("JES") or jshift.startswith("JER"):
+            mass_branch = "bbFatJetScoutParTmassCorrectedX2p0"
+            #mass_branch = "bbFatJetScoutParTmassGeneric0"
+            #mass_branch = "bbFatJetMsd0"
+            if jshift == "":
+                pt_branch = "bbFatJetPt0"
+                mass_branch = "bbFatJetScoutParTmassCorrectedX2p0"
+                # mass_branch = "bbFatJetScoutParTmassGeneric0"
+                #mass_branch = "bbFatJetMsd0"
+            elif jshift.startswith("JES") or jshift.startswith("JER"):
                 pt_branch = f"bbFatJetPt_{jshift}0"
+                mass_branch = "bbFatJetScoutParTmassCorrectedX2p0"
+                # mass_branch = "bbFatJetScoutParTmassGeneric0"
+                #mass_branch = "bbFatJetMsd0"
             elif jshift.startswith("JMS") or jshift.startswith("JMR"):
-                mass_branch = f"{MASS_VAR}_{jshift}0"
+                pt_branch = "bbFatJetPt0"
+                mass_branch = f"bbFatJetScoutParTmassCorrectedX2p_{jshift}0"
+                # mass_branch = f"bbFatJetScoutParTmassGeneric_{jshift}0"
+                #mass_branch = f"bbFatJetMsd_{jshift}0"
             # Different pass regions based on TXbb and pT bins
             selection_regions = {}
             for txbb_low, txbb_high in txbb_bins:
@@ -647,7 +550,7 @@ for year in YEARS_COMBINED_DICT:
 
                 cutflows = {}
                 
-                for sample in events_bin:
+                for sample in events:
                     cutflows[sample] = OrderedDict()
                     cutflows[sample]["Skimmer Preselection"] = events_combined[year][sample][
                         "finalWeight"
@@ -669,34 +572,24 @@ for year in YEARS_COMBINED_DICT:
                 cuts={
                     pt_branch: [pt_low, pt_high],
                     mass_branch: [m_low, m_high],
-                    f"{tagger_branch}0": [0.0, min(0.9, min_txbb)], # Having tagger score selection at 0.9 leaks Zbb to fail
+                    f"{tagger_branch}0": [0.3, min(0.9, min_txbb)], # Having tagger score selection at 0.9 leaks Zbb to fail
                 },
                 label="fail",
-            )
-            selection_regions[QCD_FAIL_REGION] = postprocessing.Region(
-                cuts={
-                    pt_branch: [pt_low, pt_high],
-                    mass_branch: [m_low, m_high],
-                    f"{tagger_branch}0": [QCD_FAIL_TXBB_MIN, min(0.9, min_txbb)],
-                },
-                label=QCD_FAIL_REGION,
             )
             print(f"Selection regions for {year} with jshift {jshift}: {selection_regions.keys()}")
 
             fit_shape_var = postprocessing.ShapeVar(
                 mass_branch,
-                MASS_LABEL,
+                r"$m_\mathrm{X2p}$ (GeV)",
                 [n_mass_bins, m_low, m_high],
                 reg=True,
-                blind_window=BLIND_WINDOW,
             )
 
             ttemps = postprocessing.get_templates(
-                events_bin,
+                events,
                 year=year,
                 sig_keys=sig_keys,
                 plot_sig_keys=sig_keys,
-                sig_scale_dict={key: SIG_SCALE for key in sig_keys},
                 selection_regions=selection_regions,
                 shape_vars=[fit_shape_var],
                 systematics={},
@@ -712,7 +605,7 @@ for year in YEARS_COMBINED_DICT:
                 show=False,
                 energy=13.6,
                 jshift=jshift,
-                blind=True,
+                blind=False,
             )
             templates = {**templates, **ttemps}
 

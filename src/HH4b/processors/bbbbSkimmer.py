@@ -1819,6 +1819,15 @@ class bbbbSkimmer(SkimmerABC):
 
         print("Selection", f"{time.time() - start:.2f}")
 
+        # Z->bb part of the cutflow (same cumulative cuts, genWeight-summed), for Zbb / non-Zbb per cut
+        cutflow_zbb = OrderedDict()
+        if "GenZBB" in genVars and not isData:
+            is_zbb = genVars["GenZBB"].astype(bool).reshape(-1)
+            cutflow_zbb["all"] = np.sum(gen_weights[is_zbb])
+            cuts = [c for c in cutflow if c != "all"]
+            for i, c in enumerate(cuts):
+                cutflow_zbb[c] = np.sum(gen_weights[selection.all(*cuts[: i + 1]) & is_zbb])
+
         ######################
         # Weights
         ######################
@@ -1859,7 +1868,9 @@ class bbbbSkimmer(SkimmerABC):
         self.dump_table(dataframe, fname)
 
         print("Return ", f"{time.time() - start:.2f}")
-        return {year: {dataset: {"totals": totals_dict, "cutflow": cutflow}}}
+        return {
+            year: {dataset: {"totals": totals_dict, "cutflow": cutflow, "cutflow_zbb": cutflow_zbb}}
+        }
 
     def postprocess(self, accumulator):
         return accumulator

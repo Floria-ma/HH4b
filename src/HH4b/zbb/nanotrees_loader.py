@@ -70,9 +70,9 @@ MC_WEIGHT_BRANCHES = [
 DEFAULT_SELECTION = {
     # probe ("lead") jet, the first one of the outputs: "txbb" the highest-TXbb jet, "pt" the leading-pT jet.
     # The "lead"/"lower-TXbb" cuts below are on the probe and the other jet
-    "sort_by": "pt",
-    "pt_lead": 0,  # highest-TXbb jet
-    "txbb_lead": 0,  # highest-TXbb jet
+    "sort_by": "txbb",
+    "pt_lead": 300,  # highest-TXbb jet
+    "txbb_lead": 0.3,  # highest-TXbb jet
     "pt_subl": 0,  # both jets
     "dphi": 2.2,  # NanoTrees already require > 2.2
     "ht": 0,  # NanoTrees ht sums all scouting AK4 jets, the skimmer only the good_ak4jets
@@ -173,7 +173,7 @@ def _select_chunk(
         recoil = {
             name: np.where(swap, _to_np(arrays, b0), _to_np(arrays, b1)) for name, (b0, b1) in VVSQCD_BRANCHES.items()
         }
-        sel = sel & ((recoil["WVsQCD"] + 0.67 * recoil["ZVsQCD"]) / 1.67 < cuts["recoil_vvsqcd"])
+        sel = sel & ((recoil["WVsQCD"] + 0.67 * recoil["ZVsQCD"]) / 1.67 > cuts["recoil_vvsqcd"])
     shift_tagged, shift_other = np.broadcast_to(cuts["msd_mreg_shift"], 2)
     for jet in (0, 1):
         # jet 1 (subleading pT) is the highest-TXbb jet if swap

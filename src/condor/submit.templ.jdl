@@ -7,16 +7,19 @@ request_memory          = 4500
 use_x509userproxy       = true
 x509userproxy           = $proxy
 +JobFlavour             = "tomorrow"
+# rerun jobs that exit non-zero (e.g. transient GitHub clone failures)
+max_retries             = 3
 
 #output                  = /eos/user/e/eheikkil/logs/${prefix}_$jobid.out
 #error                   = /eos/user/e/eheikkil/logs/${prefix}_$jobid.err
 #log                     = /eos/user/e/eheikkil/logs/${prefix}_$jobid.log
 
-output = /dev/null
-error = /dev/null
+output = $dir/${prefix}_$jobid.out
+error = $dir/${prefix}_$jobid.err
 log = /dev/null
 
 
-+SingularityImage = "/cvmfs/unpacked.cern.ch/registry.hub.docker.com/coffeateam/coffea-dask:latest-py3.8"
+# coffea-dask:latest-py3.8 no longer exists on cvmfs; this matches the local hh4b env (coffea 0.7.21, py3.10)
++SingularityImage = "/cvmfs/unpacked.cern.ch/registry.hub.docker.com/coffeateam/coffea-base-almalinux8:0.7.21-py3.10"
 
 Queue 1

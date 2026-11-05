@@ -12,6 +12,8 @@ import argparse
 import glob
 import os
 import re
+import shutil
+import tempfile
 
 ROOT.gROOT.SetBatch(True)
 
@@ -257,13 +259,18 @@ for cat_name, cat_cfg in categories.items():
         ),
     )
     # The file is rewritten instead of uproot.update: deleting and rewriting a key with uproot.update can leave a
-    # duplicated end segment in the free list, after which uproot.update fails on the file (AssertionError)
+    # duplicated end segment in the free list, after which uproot.update fails on the file (AssertionError).
+    # It is written on local disk, then copied: uproot writing directly to EOS (FUSE) can corrupt the file
     with uproot.open(root_out_name) as fin:
         hists = {k: fin[k] for k in fin.keys(cycle=False) if k != f"qcd_{cat_name}"}
     hists[f"qcd_{cat_name}"] = qcd_th1
-    with uproot.recreate(root_out_name) as fout:
-        for k, h in hists.items():
-            fout[k] = h
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpfile = os.path.join(tmpdir, os.path.basename(root_out_name))
+        with uproot.recreate(tmpfile) as fout:
+            for k, h in hists.items():
+                fout[k] = h
+        shutil.copyfile(tmpfile, f"{root_out_name}.tmp")
+        os.replace(f"{root_out_name}.tmp", root_out_name)
     print(f"Wrote qcd_{cat_name} to", root_out_name)
 
 print(f"\nAll {flavor} categories processed.")
