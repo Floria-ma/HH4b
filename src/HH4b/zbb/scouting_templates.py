@@ -10,7 +10,7 @@ import correctionlib
 from collections import OrderedDict
 import uproot
 
-tag = "14Feb2026_VJets_TT_Only_v15_scouting_zbb" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
+tag = "5Nov2026_Scouting_zbb_2023_2024" # symlinks to zqq_2023_full (2023) and 02Nov2026_2024_v15_scouting_zbb (2024), Zto2Q only #"5Nov2026_Scouting_zbb_2024" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
 
 # Pass and fail regions
 txbb_bins = [0.96, 1.0]
@@ -21,40 +21,49 @@ pt_bins = [350, 450, 550, 1800]
 txbb_bins = list(zip(txbb_bins[:-1], txbb_bins[1:]))
 pt_bins = list(zip(pt_bins[:-1], pt_bins[1:]))
 
+# Mass window of the VH NanoTrees producer (vhTreeProducer mass_range), emulated on both bbFatJets: a jet passes
+# if its msd or its m_res is in [low, high). None: off
+PRODUCER_MASS_RANGE = (20, 250)
+# lepton-jet cleaning of the VH NanoTrees producer on both bbFatJets (bbFatJetLepClean of bbbbSkimmer: no lepton with
+# pT > 20 within dR < 0.8). Needs skims with that column (and REPROCESS = True for the event caches made before it)
+PRODUCER_LEP_CLEANING: bool = True
+
 # Mass bins
 m_low, m_high = 40, 180
 bin_width = 5
 n_mass_bins = int((m_high - m_low) / bin_width)
 
-STORAGE_PROJ_DIR = Path("/eos/user/e/eheikkil/bbbb/")
+STORAGE_PROJ_DIR = Path("/eos/user/z/zima/bbbb/")
 DATA_DIR = STORAGE_PROJ_DIR / f"skimmer/{tag}"
 PROCESSED_DIR = STORAGE_PROJ_DIR / f"scouting/templates/{tag}"
 # PROCESSED_DIR = Path("processed")
 PROCESSED_DIR.mkdir(exist_ok=True, parents=True)
 
-REPROCESS: bool = True  # if True, reprocess from the skimmed ntuples
+REPROCESS: bool = False  # if True, reprocess from the skimmed ntuples
 APPLY_Z_RECOIL_CORR: bool = False # if True, apply the Z->2Q recoil corrections derived from ZMuMu measurement
 DO_JESR: bool = False # can't
 DO_JMSR: bool = True
+ZQQ_BB_CUTFLOW: bool = True  # if True, also save the cutflows of Zto2Q split into Z->bb with the probe jet matched to the Z, and the rest
 tagger_branch = "bbFatJetScoutParTTXbb"
 
 
 YEARS = [
     # "2022", 
     # "2022EE", 
-     "2023", 
-    "2023BPix",
+     "2023",
+    # "2023BPix",  # no 2023BPix Zto2Q skim
     "2024"
     ]
 YEARS_COMBINED_DICT = {
     # "2022All": [
-    #         "2022", 
+    #         "2022",
     #         "2022EE"
     #         ],
-     "2023All": [
-             "2023", 
-            "2023BPix"
-             ],
+    #  "2023All": [
+    #          "2023",
+    #         "2023BPix"
+    #          ],
+    "2023": ["2023"],
     "2024": ["2024"]
 }
 RUNS = {
@@ -72,27 +81,27 @@ RUNS = {
 }
 
 SAMPLES_DICT = {
-    "data": [
-        #2023
-        "Run2023C", 
+    # "data": [
+    #     #2023
+    #     "Run2023C", 
 
-        # 2023BPix
-        "Run2023D",
+    #     # 2023BPix
+    #     "Run2023D",
 
-        # 2024
-        "Run2024C", 
-        "Run2024D",
-        "Run2024E",
-        "Run2024F",
-        "Run2024G",
-        "Run2024H",
-        "Run2024I"
-    ],
-    # QCD from data in CR
-    "ttbar": ["TTto4Q", "TTtoLNu2Q", "TTto2L2Nu"],
+    #     # 2024
+    #     "Run2024C", 
+    #     "Run2024D",
+    #     "Run2024E",
+    #     "Run2024F",
+    #     "Run2024G",
+    #     "Run2024H",
+    #     "Run2024I"
+    # ],
+    # # QCD from data in CR
+    # "ttbar": ["TTto4Q", "TTtoLNu2Q", "TTto2L2Nu"],
     "Zto2Q": ["Zto2Q-4Jets"],
-    "Wto2Q": ["Wto2Q-3Jets"],
-}
+    # "Wto2Q": ["Wto2Q-3Jets"],
+}  # only Zto2Q in the 2023 + 2024 Zto2Q skims
 MC_SAMPLES_LIST = [sample for sample in SAMPLES_DICT.keys() if sample != "data"]
 
 # Columns to load from the ntuples
@@ -137,10 +146,14 @@ mass_variations = []
 if DO_JMSR:
     for jmsr, ud in itertools.product(["JMS", "JMR"], ["up", "down"]):
         for var in mass_vars:
+            if var == "bbFatJetScoutParTmassCorrResonance":
+                continue  # no JMS/JMR variations of it in the skims
             mass_variations.append(f"{var}_{jmsr}_{ud}")
 
 
 base_columns = [(var, 2) for var in fatjet_vars] + [("weight", 1)]
+if PRODUCER_LEP_CLEANING:
+    base_columns += [("bbFatJetLepClean", 2)]
 
 load_columns_pt_var = []
 for pt_var in pt_variations:
@@ -433,7 +446,8 @@ def apply_jmsr_smearing_in_templates(
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Zto2Q_unmatched", "Wto2Q", "hbb", "ttbar", "qcd"]
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Zto2Q_unmatched", "Wto2Q", "ttbar", "qcd"]
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar", "qcd"]
-bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar"]
+# bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar"]
+bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ"]  # Zto2Q only
 sig_keys = []
 bg_order = list(reversed(bkg_keys))
 
@@ -486,7 +500,11 @@ if APPLY_Z_RECOIL_CORR:
     )
 
 for year in YEARS_COMBINED_DICT:
-    out_dir = Path(f"/eos/user/e/eheikkil/scouting/templates/{tag}/")
+    out_dir = PROCESSED_DIR  # was /eos/user/e/eheikkil/scouting/templates/{tag}/, not writable
+    if PRODUCER_MASS_RANGE is not None:
+        out_dir = out_dir / f"producerMass{PRODUCER_MASS_RANGE[0]}to{PRODUCER_MASS_RANGE[1]}"
+    if PRODUCER_LEP_CLEANING:
+        out_dir = Path(f"{out_dir}_lepClean") if PRODUCER_MASS_RANGE is not None else out_dir / "lepClean"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     template_dir = out_dir
@@ -540,6 +558,19 @@ for year in YEARS_COMBINED_DICT:
                 mass_branch = f"bbFatJetScoutParTmassCorrectedX2p_{jshift}0"
                 # mass_branch = f"bbFatJetScoutParTmassGeneric_{jshift}0"
                 #mass_branch = f"bbFatJetMsd_{jshift}0"
+            # producer mass window on both jets, OR of msd and m_res ("a+b" cuts of utils.make_selection)
+            producer_mass_cuts = {}
+            if PRODUCER_MASS_RANGE is not None:
+                for i in range(2):
+                    producer_mass_cuts[f"bbFatJetMsd{i}+bbFatJetScoutParTmassCorrResonance{i}"] = [
+                        list(PRODUCER_MASS_RANGE),
+                        list(PRODUCER_MASS_RANGE),
+                    ]
+            # then the producer lepton-jet cleaning on both jets (1: kept), the last steps of the cutflow
+            if PRODUCER_LEP_CLEANING:
+                for i in range(2):
+                    producer_mass_cuts[f"bbFatJetLepClean{i}"] = [0.5, 1.5]
+
             # Different pass regions based on TXbb and pT bins
             selection_regions = {}
             for txbb_low, txbb_high in txbb_bins:
@@ -564,6 +595,7 @@ for year in YEARS_COMBINED_DICT:
                         pt_branch: [pt_low, pt_high],
                         mass_branch: [m_low, m_high],
                         f"{tagger_branch}0": [txbb_low, txbb_high],
+                        **producer_mass_cuts,
                     },
                     label=region_key,
                 )
@@ -572,6 +604,7 @@ for year in YEARS_COMBINED_DICT:
                 cuts={
                     pt_branch: [pt_low, pt_high],
                     mass_branch: [m_low, m_high],
+                    **producer_mass_cuts,
                     f"{tagger_branch}0": [0.3, min(0.9, min_txbb)], # Having tagger score selection at 0.9 leaks Zbb to fail
                 },
                 label="fail",
@@ -597,7 +630,7 @@ for year in YEARS_COMBINED_DICT:
                 bg_keys=bkg_keys,
                 bg_order=bg_order,
                 bg_err_mcstat=False,
-                plot_dir=plot_dir,
+                plot_dir=plot_dir if "data" in events else "",  # the data/MC plots need data
                 prev_cutflow=cutflows,
                 weight_key="finalWeight",
                 weight_shifts=weight_shifts,
@@ -608,6 +641,24 @@ for year in YEARS_COMBINED_DICT:
                 blind=False,
             )
             templates = {**templates, **ttemps}
+
+            # Zto2Q cutflow split into Z->bb with the probe jet (highest TXbb) matched to the Z (as Zto2Q_BB) and the
+            # rest (nominal only), saved next to the get_templates cutflows
+            if ZQQ_BB_CUTFLOW and jshift == "" and "Zto2Q" in events:
+                is_zbb = events["Zto2Q"][("GenZBB", 0)].astype(bool) & (
+                    events["Zto2Q"][("bbFatJetVQQMatch", 0)] == 1
+                )
+                zqq_split = {"Zto2Q_ZBB": events["Zto2Q"][is_zbb], "Zto2Q_nonZBB": events["Zto2Q"][~is_zbb]}
+                zqq_prev = pd.DataFrame.from_dict(
+                    {s: {"Skimmer Preselection": df["finalWeight"].to_numpy().sum()} for s, df in zqq_split.items()}
+                ).transpose()
+                for rname, region in selection_regions.items():
+                    _, zqq_cf = utils.make_selection(
+                        region.cuts, zqq_split, weight_key="finalWeight", prev_cutflow=zqq_prev
+                    )
+                    zqq_cf.loc["ZBB/nonZBB"] = zqq_cf.loc["Zto2Q_ZBB"] / zqq_cf.loc["Zto2Q_nonZBB"]
+                    print(f"Zto2Q ZBB / non-ZBB cutflow {rname}\n{zqq_cf.round(3)}")
+                    zqq_cf.round(3).to_csv(out_dir / "cutflows" / year / f"{rname}_cutflow_ZBBsplit.csv")
 
         # Save the templates to a file
         outfile = template_dir / f"templates_{year}_{pt_bin_key}.root"

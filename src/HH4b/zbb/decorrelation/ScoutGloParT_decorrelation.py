@@ -5,6 +5,8 @@ import pickle
 import numpy as np
 import uproot
 import matplotlib.pyplot as plt
+from matplotlib import gridspec
+from matplotlib.colors import LogNorm
 import mplhep as hep
 from scipy.ndimage import gaussian_filter
 from tqdm import tqdm
@@ -19,7 +21,18 @@ YEARS = ["2023", "2023BPix","2024"]
 TAG = "13Feb2026_Data_Standard_Cuts_QCD_Inclusive_v15_scouting_zbb"
 YEAR_DIRS = [f"{SKIMMER_DIR}/{TAG}/{y}" for y in YEARS]
 
-OUTDIR = "/eos/user/z/zima/MASS_DECORRELATION_EFFORTS/NoSmoothing/outputs"
+# QCD input: "skimmer" (bbbbSkimmer root files of YEAR_DIRS, mass mX2p) or "nanotrees" (VH NanoTrees "had" QCD, the
+# highest-TXbb jet of nanotrees_loader.DEFAULT_SELECTION, mass m_res, the only regressed mass of the NanoTrees)
+INPUT = "nanotrees"
+NANOTREES_DIR = "/eos/user/z/zima/HadronicVH/tagger_Cali_2024_had"
+NANOTREES_QCD_FILES = "mc/skim/qcd*_tree.root"
+MVAR = {"skimmer": "mX2p", "nanotrees": "mres"}[INPUT]
+YEAR_LABEL = {"skimmer": "2023", "nanotrees": "2024"}[INPUT]
+
+OUTDIR = {
+    "skimmer": "/eos/user/z/zima/MASS_DECORRELATION_EFFORTS/NoSmoothing/outputs",
+    "nanotrees": "/eos/user/z/zima/MASS_DECORRELATION_EFFORTS/NoSmoothing/outputs_nanotrees_2024",
+}[INPUT]
 os.makedirs(OUTDIR, exist_ok=True)
 FILENAME = f"{OUTDIR}/second_bins_TXBBPRECUT0p3.pkl"
 
@@ -42,6 +55,8 @@ TXBB_EDGES = np.linspace(0.0, 1.0, N_TXBB + 1)
 # utilities
 
 def get_qcd_files(year_dirs=YEAR_DIRS):
+    if INPUT == "nanotrees":
+        return load_nanotrees_qcd()
     qcd_filelist = []
     for year_dir in year_dirs:
         for root, _, files in os.walk(year_dir):
@@ -52,6 +67,45 @@ def get_qcd_files(year_dirs=YEAR_DIRS):
 
     print(f"Length of QCD filelist: {len(qcd_filelist)}")
     return qcd_filelist
+
+
+def load_nanotrees_qcd():
+    """(TXbb, pT, m_res, weight) of the highest-TXbb jet of the NanoTrees QCD, as one "file" for iter_qcd.
+    Read once: the selected QCD (~15M events) fits in memory, the full trees take a while to read"""
+    from HH4b.zbb import nanotrees_loader
+
+    cols = ["bbFatJetPt", "bbFatJetScoutParTTXbb", "bbFatJetScoutParTmassCorrResonance"]
+    out = [[], [], [], []]
+    chunks = nanotrees_loader.iterate_nanotrees(
+        NANOTREES_DIR, "QCD", selection=nanotrees_loader.DEFAULT_SELECTION, apply_trig_sf=True,
+        file_pattern=NANOTREES_QCD_FILES, jet_columns=cols,
+    )
+    for _, chunk in tqdm(chunks, desc="Reading NanoTrees QCD", unit=" chunks"):
+        if chunk is None:
+            continue
+        out[0].append(chunk["bbFatJetScoutParTTXbb"][:, 0])
+        out[1].append(chunk["bbFatJetPt"][:, 0])
+        out[2].append(chunk["bbFatJetScoutParTmassCorrResonance"][:, 0])
+        out[3].append(chunk["weight"][:, 0])
+    return [tuple(np.concatenate(a) for a in out)]
+
+
+def iter_qcd(files):
+    """Yields (TXbb, pT, mass, weight) of the highest-TXbb jet per skimmer file, or the NanoTrees QCD arrays"""
+    for f in files:
+        if isinstance(f, tuple):
+            yield f
+            continue
+        with uproot.open(f) as file:
+            if "Events" not in file:
+                continue
+            ev = file["Events"]
+            yield (
+                ev["bbFatJetScoutParTTXbb0"].array(library="np"),
+                ev["bbFatJetPt0"].array(library="np"),
+                ev["bbFatJetScoutParTmassCorrectedX2p0"].array(library="np"),
+                ev["weight"].array(library="np"),
+            )
 
 
 def compute_rho(m, pt):
@@ -65,40 +119,28 @@ def build_binned_histograms(files):
     hists  = np.zeros((N_PT, N_RHO, N_TXBB), dtype=np.float64)
     counts = np.zeros((N_PT, N_RHO), dtype=np.int64)
 
-    for f in tqdm(files, desc="Binning QCD"):
-        with uproot.open(f) as file:
-            if "Events" not in file:
-                continue
+    for txbb, pt, m, w in tqdm(iter_qcd(files), total=len(files), desc="Binning QCD"):
+        mask = (pt > 0) & (m > 0) & np.isfinite(txbb)
+        txbb, pt, m, w = txbb[mask], pt[mask], m[mask], w[mask]
 
-            ev = file["Events"]
+        if extra_txbb_cut != 0.0:
+            pre = txbb > extra_txbb_cut # extra selection to match data selections made earlier
+            txbb, pt, m, w = txbb[pre], pt[pre], m[pre], w[pre] 
 
-            txbb = ev["bbFatJetScoutParTTXbb0"].array(library="np")
-            pt   = ev["bbFatJetPt0"].array(library="np")
-            m    = ev["bbFatJetScoutParTmassCorrectedX2p0"].array(library="np")
-            w    = ev["weight"].array(library="np")
+        rho = compute_rho(m, pt)
 
-            mask = (pt > 0) & (m > 0) & np.isfinite(txbb)
-            txbb, pt, m, w = txbb[mask], pt[mask], m[mask], w[mask]
+        ipt  = np.digitize(pt,  pt_edges)  - 1
+        irho = np.digitize(rho, rho_edges) - 1
+        it   = np.digitize(txbb, TXBB_EDGES) - 1
 
-            if extra_txbb_cut != 0.0:
-                pre = txbb > extra_txbb_cut # extra selection to match data selections made earlier
-                txbb, pt, m, w = txbb[pre], pt[pre], m[pre], w[pre] 
+        valid = (
+            (ipt  >= 0) & (ipt  < N_PT) &
+            (irho >= 0) & (irho < N_RHO) &
+            (it   >= 0) & (it   < N_TXBB)
+        )
 
-            rho = compute_rho(m, pt)
-
-            ipt  = np.digitize(pt,  pt_edges)  - 1
-            irho = np.digitize(rho, rho_edges) - 1
-            it   = np.digitize(txbb, TXBB_EDGES) - 1
-
-            valid = (
-                (ipt  >= 0) & (ipt  < N_PT) &
-                (irho >= 0) & (irho < N_RHO) &
-                (it   >= 0) & (it   < N_TXBB)
-            )
-
-            for i, j, k, ww in zip(ipt[valid], irho[valid], it[valid], w[valid]):
-                hists[i, j, k] += ww
-                counts[i, j]  += 1
+        np.add.at(hists, (ipt[valid], irho[valid], it[valid]), w[valid])
+        np.add.at(counts, (ipt[valid], irho[valid]), 1)
 
     return {
         "hists": hists,
@@ -151,7 +193,7 @@ def plot_raw_surface(qsurf, bins, alpha):
         ha="left", va="top", fontsize=40, fontweight="bold"#, color = "white"
     )
 
-    hep.cms.label(ax=ax, year="2023", com="13.6")
+    hep.cms.label(ax=ax, year=YEAR_LABEL, com="13.6")
     fig.savefig(f"{OUTDIR}/raw_quantile_alpha_{alpha}.pdf")
     plt.close(fig)
 
@@ -262,7 +304,7 @@ def plot_efficiency(eff, bins, alpha):
         ha="left", va="top", fontsize=14, fontweight="bold"
     )
 
-    hep.cms.label(ax=ax, year="2023", com="13.6")
+    hep.cms.label(ax=ax, year=YEAR_LABEL, com="13.6")
     fig.savefig(f"{OUTDIR}/decorrelated_efficiency_alpha_{alpha}.pdf")
     plt.close(fig)
 
@@ -274,56 +316,45 @@ def compute_decorrelated_efficiency_weighted(files, qsurf, bins):
     passed_w = np.zeros((N_PT, N_RHO), dtype=np.float64)
     total_w  = np.zeros((N_PT, N_RHO), dtype=np.float64)
 
-    for f in tqdm(files, desc="Decorrelating QCD (weighted)"):
-        with uproot.open(f) as file:
-            if "Events" not in file:
-                continue
+    for txbb, pt, m, w in tqdm(iter_qcd(files), total=len(files), desc="Decorrelating QCD (weighted)"):
+        mask = (pt > 0) & (m > 0) & np.isfinite(txbb) & np.isfinite(w)
+        if not np.any(mask):
+            continue
 
-            ev = file["Events"]
+        txbb = txbb[mask]
+        pt   = pt[mask]
+        m    = m[mask]
+        w    = w[mask]
 
-            txbb = ev["bbFatJetScoutParTTXbb0"].array(library="np")
-            pt   = ev["bbFatJetPt0"].array(library="np")
-            m    = ev["bbFatJetScoutParTmassCorrectedX2p0"].array(library="np")
-            w    = ev["weight"].array(library="np")
+        rho = compute_rho(m, pt)
 
-            mask = (pt > 0) & (m > 0) & np.isfinite(txbb) & np.isfinite(w)
-            if not np.any(mask):
-                continue
+        ipt  = np.digitize(pt,  pt_edges)  - 1
+        irho = np.digitize(rho, rho_edges) - 1
 
-            txbb = txbb[mask]
-            pt   = pt[mask]
-            m    = m[mask]
-            w    = w[mask]
+        valid = (
+            (ipt  >= 0) & (ipt  < N_PT) &
+            (irho >= 0) & (irho < N_RHO)
+        )
 
-            rho = compute_rho(m, pt)
+        ipt  = ipt[valid]
+        irho = irho[valid]
+        txbb = txbb[valid]
+        w    = w[valid]
 
-            ipt  = np.digitize(pt,  pt_edges)  - 1
-            irho = np.digitize(rho, rho_edges) - 1
+        q = qsurf[ipt, irho]
+        ok_q = np.isfinite(q)
 
-            valid = (
-                (ipt  >= 0) & (ipt  < N_PT) &
-                (irho >= 0) & (irho < N_RHO)
-            )
+        ipt  = ipt[ok_q]
+        irho = irho[ok_q]
+        txbb = txbb[ok_q]
+        w    = w[ok_q]
+        q    = q[ok_q]
 
-            ipt  = ipt[valid]
-            irho = irho[valid]
-            txbb = txbb[valid]
-            w    = w[valid]
+        t_decorr = txbb - q
+        passed = t_decorr > 0
 
-            q = qsurf[ipt, irho]
-            ok_q = np.isfinite(q)
-
-            ipt  = ipt[ok_q]
-            irho = irho[ok_q]
-            txbb = txbb[ok_q]
-            w    = w[ok_q]
-            q    = q[ok_q]
-
-            t_decorr = txbb - q
-            passed = t_decorr > 0
-
-            np.add.at(total_w,  (ipt, irho), w)
-            np.add.at(passed_w, (ipt[passed], irho[passed]), w[passed])
+        np.add.at(total_w,  (ipt, irho), w)
+        np.add.at(passed_w, (ipt[passed], irho[passed]), w[passed])
 
     eff = np.divide(
         passed_w,
@@ -415,7 +446,7 @@ def plot_quantile_efficiency_matrix(
         label="QCD efficiency"
     )
 
-    hep.cms.label(ax=axes[0, 0], year="2023", com="13.6")
+    hep.cms.label(ax=axes[0, 0], year=YEAR_LABEL, com="13.6")
     fig.savefig(outname)
     plt.close(fig)
 
@@ -558,7 +589,7 @@ def main():
             smooth=USE_SMOOTHING
         )
 
-        mvar = "mX2p"
+        mvar = MVAR
 
         save_results((qsurf, bins["pt_edges"], bins["rho_edges"]), f"{OUTDIR}/TXBBPRECUT0p3_qsurf_{str(alpha).replace('.', 'p')}_{mvar}.pkl")
 

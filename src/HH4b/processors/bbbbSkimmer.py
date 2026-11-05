@@ -1146,10 +1146,27 @@ class bbbbSkimmer(SkimmerABC):
             f"ak8FatJet{key}": pad_val(fatjets[var], 3, axis=1)
             for (var, key) in fatjet_skimvars.items()
         }
-        bbFatJetVars = { 
+        bbFatJetVars = {
             f"bbFatJet{key}": pad_val(fatjets_xbb[var], 2, axis=1)
             for (var, key) in fatjet_skimvars.items()
         }
+
+        if self.use_scouting:
+            # lepton-jet cleaning of the VH NanoTrees producer (vhTreeProducer._selectLeptons/_preSelect): a jet is
+            # dropped if a loose lepton (pT > 20, |eta| < 2.4 muons / 2.5 electrons, no ID or isolation) is within
+            # dR < 0.8. 1: no such lepton (kept by the producer), 0: dropped
+            muons = events.ScoutingMuonVtx if hasattr(events, "ScoutingMuonVtx") else events.ScoutingMuon
+            producer_leptons = [
+                muons[(muons.pt > 20) & (abs(muons.eta) < 2.4)],
+                events.ScoutingElectron[(events.ScoutingElectron.pt > 20) & (abs(events.ScoutingElectron.eta) < 2.5)],
+            ]
+            near_lepton = None
+            for leptons in producer_leptons:
+                fj, lep = ak.unzip(ak.cartesian([fatjets_xbb, leptons], nested=True))
+                dphi = (fj.phi - lep.phi + np.pi) % (2 * np.pi) - np.pi
+                near = ak.any((fj.eta - lep.eta) ** 2 + dphi**2 < 0.8**2, axis=2)
+                near_lepton = near if near_lepton is None else (near_lepton | near)
+            bbFatJetVars["bbFatJetLepClean"] = pad_val(~near_lepton, 2, axis=1)
         print("Jet vars", f"{time.time() - start:.2f}")
 
         # JEC and JMSR
@@ -1819,10 +1836,11 @@ class bbbbSkimmer(SkimmerABC):
 
         print("Selection", f"{time.time() - start:.2f}")
 
-        # Z->bb part of the cutflow (same cumulative cuts, genWeight-summed), for Zbb / non-Zbb per cut
+        # Z->bb part of the cutflow (same cumulative cuts, genWeight-summed), for Zbb / non-Zbb per cut:
+        # Z->bb events whose probe jet (bbFatJet 0, highest TXbb) is matched to the Z and both its b quarks
         cutflow_zbb = OrderedDict()
         if "GenZBB" in genVars and not isData:
-            is_zbb = genVars["GenZBB"].astype(bool).reshape(-1)
+            is_zbb = genVars["GenZBB"].astype(bool).reshape(-1) & (genVars["bbFatJetVQQMatch"][:, 0] == 1)
             cutflow_zbb["all"] = np.sum(gen_weights[is_zbb])
             cuts = [c for c in cutflow if c != "all"]
             for i, c in enumerate(cuts):

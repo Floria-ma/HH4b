@@ -31,7 +31,7 @@ def subtract_non_qcd(hist, file, region):
             data_minus_MC.Add(h, -1)
     return data_minus_MC
 
-def blind_sigRegion(hist, low=100, high=150):
+def blind_sigRegion(hist, low=0, high=0):
     """blind Hbb region by default (100-150), as BLIND_WINDOW of scouting_templates.py"""
     newhist = hist.Clone(hist.GetName()+"_blind")
     for i in range(1, newhist.GetNbinsX() + 1):
@@ -103,8 +103,10 @@ for cat_name, cat_cfg in categories.items():
     nbins = H_qcd_fail_hist.GetNbinsX()
 
     # blind Hbb signal region (100-150) for the TF fit and epsilon calculation
-    H_goodV_pass_blind = blind_sigRegion(H_qcd_pass_hist)
-    H_qcd_fail_blind = blind_sigRegion(H_qcd_fail_hist)
+   # H_goodV_pass_blind = blind_sigRegion(H_qcd_pass_hist)
+   # H_qcd_fail_blind = blind_sigRegion(H_qcd_fail_hist)
+    H_goodV_pass_blind = H_qcd_pass_hist
+    H_qcd_fail_blind = H_qcd_fail_hist
 
     # pass/fail ratio from the blinded histograms (blinded bins are empty and skipped by the fit)
     ratio = H_goodV_pass_blind.Clone(f"ratio_{flavor}_{cat_name}")

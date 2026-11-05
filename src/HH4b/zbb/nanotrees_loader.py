@@ -77,11 +77,13 @@ DEFAULT_SELECTION = {
     "dphi": 2.2,  # NanoTrees already require > 2.2
     "ht": 0,  # NanoTrees ht sums all scouting AK4 jets, the skimmer only the good_ak4jets
     "met": None,  # needs the met branch, which the skims of skim_nanotrees.py do not keep
-    "mreg": (40, 200),  # (min, max) regressed mass of both jets
+    "mreg": None,  # (min, max) regressed mass of both jets
     "msd": None,  # (min, max) soft drop mass of both jets
     "msd_mreg_ratio": None,  # (min, max) of (msd + msd_mreg_shift) / regressed mass, for both jets
     # shift of the msd in msd_mreg_ratio: one value for both jets, or (highest-TXbb jet, other jet)
     "msd_mreg_shift": 10.0,
+    # jets the mreg, msd and msd_mreg_ratio cuts apply to: "probe" only, or "both"
+    "mass_cut_jets": "probe",
     # max VVsQCD of the lower-TXbb jet, against the VH had Hbb/Hcc signal regions (V jet VVsQCD > 0.7)
     "recoil_vvsqcd": None,
 }
@@ -101,6 +103,7 @@ VH_HAD_SELECTION = {
     "msd": (30, 190),
     "msd_mreg_ratio": (0.8, 1.2),
     "msd_mreg_shift": (15.0, 10.0),  # H, V candidate
+    "mass_cut_jets": "both",  # H and V candidate
     "recoil_vvsqcd": None,
 }
 
@@ -178,16 +181,20 @@ def _select_chunk(
     for jet in (0, 1):
         # jet 1 (subleading pT) is the highest-TXbb jet if swap
         is_tagged = swap if jet == 1 else ~swap
+        # events where this jet gets the mass cuts: all, or only those where it is the probe
+        exempt = ~is_tagged if cuts.get("mass_cut_jets", "both") == "probe" else False
         if cuts.get("mreg") is not None:
-            sel = sel & (mreg[jet] > cuts["mreg"][0]) & (mreg[jet] < cuts["mreg"][1])
+            sel = sel & (exempt | ((mreg[jet] > cuts["mreg"][0]) & (mreg[jet] < cuts["mreg"][1])))
         if cuts.get("msd") is not None:
-            sel = sel & (msd[jet] > cuts["msd"][0]) & (msd[jet] < cuts["msd"][1])
+            sel = sel & (exempt | ((msd[jet] > cuts["msd"][0]) & (msd[jet] < cuts["msd"][1])))
         if cuts.get("msd_mreg_ratio") is not None:
             shifted = msd[jet] + np.where(is_tagged, shift_tagged, shift_other)
-            sel = (
-                sel
-                & (shifted > cuts["msd_mreg_ratio"][0] * mreg[jet])
-                & (shifted < cuts["msd_mreg_ratio"][1] * mreg[jet])
+            sel = sel & (
+                exempt
+                | (
+                    (shifted > cuts["msd_mreg_ratio"][0] * mreg[jet])
+                    & (shifted < cuts["msd_mreg_ratio"][1] * mreg[jet])
+                )
             )
 
     if not np.any(sel):

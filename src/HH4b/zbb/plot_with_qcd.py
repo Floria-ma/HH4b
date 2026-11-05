@@ -20,7 +20,7 @@ MC_KEYS = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar", "singletop"]  #
 QCD_KEY = "qcd"
 DATA_KEY = "data"
 BG_ORDER = [QCD_KEY, "Wto2Q", "Zto2Q_QQ", "Zto2Q_CC", "ttbar", "singletop", "Zto2Q_BB"]  # bottom to top of the stack
-BLIND_WINDOW = (100, 150)  # BLIND_WINDOW of scouting_templates.py, data hidden there
+BLIND_WINDOW = (0, 0)  # BLIND_WINDOW of scouting_templates.py, data hidden there
 MASS_LABEL = r"$m_\mathrm{res}$ (GeV)"
 # sig_keys of scouting_templates.py, plotted unstacked (step) and scaled by SIG_SCALE
 SIG_KEYS = ["hbb"]

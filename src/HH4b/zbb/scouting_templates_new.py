@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 
 from pathlib import Path
+import pickle
 
 from HH4b import utils
 from HH4b import postprocessing
@@ -45,8 +46,14 @@ NANOTREES_SELECTIONS = {
 NANOTREES_APPLY_TRIG_SF = SELECTION == "zbb"
 
 tag = "14Feb2026_VJets_TT_Only_v15_scouting_zbb" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
+# mass-decorrelated pass/fail: pass TXbb_DDT = TXbb - TXbb^alpha(rho, pT) > 0, fail < 0, with the QCD quantile map of
+# decorrelation/ScoutGloParT_decorrelation.py (rho = ln(m^2/pT^2) of MASS_VAR, which has to be the map's mass).
+# False: the TXbb pass/fail bins below
+USE_DDT: bool = True
+DDT_QSURF_FILE = "/eos/user/z/zima/MASS_DECORRELATION_EFFORTS/NoSmoothing/outputs_nanotrees_2024/TXBBPRECUT0p3_qsurf_0p995_mres.pkl"
+
 if INPUT_FORMAT == "nanotrees":
-    tag = f"nanotrees_{Path(NANOTREES_DIR).name}_{SELECTION}"
+    tag = f"nanotrees_{Path(NANOTREES_DIR).name}_{SELECTION}" + ("_ddt" if USE_DDT else "")
 
 # Pass and fail regions
 #txbb_bins = [0.75, 0.93, 1.0] #0.75 #0.93
@@ -54,7 +61,7 @@ txbb_bins = [0.96, 1.0]
 min_txbb = txbb_bins[0]
 # pT bins
 #pt_bins = [170, 250, 350, 400, 450, 500, 550, 600, 900, 10000]
-pt_bins = [170, 200, 300, 450, 550, 10000]
+pt_bins = [350, 450, 550, 10000]
 
 txbb_bins = list(zip(txbb_bins[:-1], txbb_bins[1:]))
 pt_bins = list(zip(pt_bins[:-1], pt_bins[1:]))
@@ -78,13 +85,15 @@ tagger_branch = "bbFatJetScoutParTTXbb"
 # Regressed mass to fit. The NanoTrees only have the resonance mass, skimmer outputs also "bbFatJetScoutParTmassCorrectedX2p"
 MASS_VAR = "bbFatJetScoutParTmassCorrResonance"
 MASS_LABEL = r"$m_\mathrm{res}$ (GeV)"
-# H signal region of the VH analysis, whose selection these events share: data is zeroed there in the pass regions
-# (templates and plots). The QCD estimate and the fit have to skip these bins
-BLIND_WINDOW = [100, 150]
+# H signal region of the VH analysis, whose selection these events share: [100, 150] zeroes the data there in the pass
+# regions (with blind=True in get_templates). None: unblinded
+BLIND_WINDOW = None
 # fail region of the QCD estimate (qcd_estimation.py): the fail TXbb range with this lower bound. The "fail" region of
 # the fit (TXbb from 0) is kept as is
 QCD_FAIL_TXBB_MIN = 0.4
 QCD_FAIL_REGION = f"fail_TXbb{str(QCD_FAIL_TXBB_MIN).replace('.', 'p')}to{str(min(0.9, min_txbb)).replace('.', 'p')}"
+if USE_DDT:
+    QCD_FAIL_REGION = f"fail_TXbb{str(QCD_FAIL_TXBB_MIN).replace('.', 'p')}_DDTfail"
 
 
 YEARS = [
@@ -399,6 +408,25 @@ else:
     print("\nAll processing complete!")
 
 
+if USE_DDT:
+    # TXbb_DDT0 of the highest-TXbb jet. Events outside the map (or in its empty bins) get -10, in neither region
+    # (a NaN would be read as -1 by utils.get_feat, i.e. in the fail region)
+    with Path(DDT_QSURF_FILE).open("rb") as f:
+        qsurf, ddt_pt_edges, ddt_rho_edges = pickle.load(f)
+    for year in YEARS_COMBINED_DICT:
+        for sample, df in events_combined[year].items():
+            pt = df[("bbFatJetPt", 0)].to_numpy()
+            rho = 2 * np.log(df[(MASS_VAR, 0)].to_numpy() / pt)
+            ipt = np.digitize(pt, ddt_pt_edges) - 1
+            irho = np.digitize(rho, ddt_rho_edges) - 1
+            valid = (ipt >= 0) & (ipt < qsurf.shape[0]) & (irho >= 0) & (irho < qsurf.shape[1])
+            q = np.full(len(df), np.nan)
+            q[valid] = qsurf[ipt[valid], irho[valid]]
+            ddt = df[(tagger_branch, 0)].to_numpy() - q
+            df["TXbb_DDT0"] = np.where(np.isfinite(ddt), ddt, -10.0)
+    print("TXbb_DDT added")
+
+
 # apply ZQQ corrections if needed
 if APPLY_Z_RECOIL_CORR:
     print("Applying Zto2Q corrections...")
@@ -648,21 +676,22 @@ for year in YEARS_COMBINED_DICT:
                 mass_branch = f"{MASS_VAR}_{jshift}0"
             # Different pass regions based on TXbb and pT bins
             selection_regions = {}
-            for txbb_low, txbb_high in txbb_bins:
+
+            cutflows = {}
+            for sample in events_bin:
+                cutflows[sample] = OrderedDict()
+                cutflows[sample]["Skimmer Preselection"] = events_combined[year][sample][
+                    "finalWeight"
+                ].sum()
+                # cutflows[sample]["HLT"] = events[sample]["finalWeight"].sum()
+            cutflows = pd.DataFrame.from_dict(cutflows).transpose()
+
+            # with USE_DDT, one pass region (TXbb_DDT >= 0) named so that qcd_estimation.py finds it
+            for txbb_low, txbb_high in ([] if USE_DDT else txbb_bins):
                 # Convert to strings
                 txbb_low_str = str(txbb_low).replace(".", "p")
                 txbb_high_str = str(txbb_high).replace(".", "p")
                 region_key = f"pass_TXbb{txbb_low_str}to{txbb_high_str}_{pt_bin_key}"
-
-                cutflows = {}
-                
-                for sample in events_bin:
-                    cutflows[sample] = OrderedDict()
-                    cutflows[sample]["Skimmer Preselection"] = events_combined[year][sample][
-                        "finalWeight"
-                    ].sum()
-                    # cutflows[sample]["HLT"] = events[sample]["finalWeight"].sum()
-                cutflows = pd.DataFrame.from_dict(cutflows).transpose()
 
                 # Create a region
                 selection_regions[region_key] = postprocessing.Region(
@@ -674,22 +703,41 @@ for year in YEARS_COMBINED_DICT:
                     label=region_key,
                 )
 
-            selection_regions["fail"] = postprocessing.Region(
-                cuts={
-                    pt_branch: [pt_low, pt_high],
-                    mass_branch: [m_low, m_high],
-                    f"{tagger_branch}0": [0.0, min(0.9, min_txbb)], # Having tagger score selection at 0.9 leaks Zbb to fail
-                },
-                label="fail",
-            )
-            selection_regions[QCD_FAIL_REGION] = postprocessing.Region(
-                cuts={
-                    pt_branch: [pt_low, pt_high],
-                    mass_branch: [m_low, m_high],
-                    f"{tagger_branch}0": [QCD_FAIL_TXBB_MIN, min(0.9, min_txbb)],
-                },
-                label=QCD_FAIL_REGION,
-            )
+            if USE_DDT:
+                selection_regions[f"pass_TXbbDDT_{pt_bin_key}"] = postprocessing.Region(
+                    cuts={pt_branch: [pt_low, pt_high], mass_branch: [m_low, m_high], "TXbb_DDT0": [0.0, 1.0]},
+                    label=f"pass_TXbbDDT_{pt_bin_key}",
+                )
+                selection_regions["fail"] = postprocessing.Region(
+                    cuts={pt_branch: [pt_low, pt_high], mass_branch: [m_low, m_high], "TXbb_DDT0": [-1.0, 0.0]},
+                    label="fail",
+                )
+                selection_regions[QCD_FAIL_REGION] = postprocessing.Region(
+                    cuts={
+                        pt_branch: [pt_low, pt_high],
+                        mass_branch: [m_low, m_high],
+                        "TXbb_DDT0": [-1.0, 0.0],
+                        f"{tagger_branch}0": [QCD_FAIL_TXBB_MIN, 1.0],
+                    },
+                    label=QCD_FAIL_REGION,
+                )
+            else:
+                selection_regions["fail"] = postprocessing.Region(
+                    cuts={
+                        pt_branch: [pt_low, pt_high],
+                        mass_branch: [m_low, m_high],
+                        f"{tagger_branch}0": [0.0, min(0.9, min_txbb)], # Having tagger score selection at 0.9 leaks Zbb to fail
+                    },
+                    label="fail",
+                )
+                selection_regions[QCD_FAIL_REGION] = postprocessing.Region(
+                    cuts={
+                        pt_branch: [pt_low, pt_high],
+                        mass_branch: [m_low, m_high],
+                        f"{tagger_branch}0": [QCD_FAIL_TXBB_MIN, min(0.9, min_txbb)],
+                    },
+                    label=QCD_FAIL_REGION,
+                )
             print(f"Selection regions for {year} with jshift {jshift}: {selection_regions.keys()}")
 
             fit_shape_var = postprocessing.ShapeVar(
@@ -721,7 +769,7 @@ for year in YEARS_COMBINED_DICT:
                 show=False,
                 energy=13.6,
                 jshift=jshift,
-                blind=True,
+                blind=False,
             )
             templates = {**templates, **ttemps}
 
