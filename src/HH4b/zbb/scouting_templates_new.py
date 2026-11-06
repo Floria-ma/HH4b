@@ -49,7 +49,7 @@ tag = "14Feb2026_VJets_TT_Only_v15_scouting_zbb" #"12Feb2026_Scouting_Fixed_v15_
 # mass-decorrelated pass/fail: pass TXbb_DDT = TXbb - TXbb^alpha(rho, pT) > 0, fail < 0, with the QCD quantile map of
 # decorrelation/ScoutGloParT_decorrelation.py (rho = ln(m^2/pT^2) of MASS_VAR, which has to be the map's mass).
 # False: the TXbb pass/fail bins below
-USE_DDT: bool = True
+USE_DDT: bool = False
 DDT_QSURF_FILE = "/eos/user/z/zima/MASS_DECORRELATION_EFFORTS/NoSmoothing/outputs_nanotrees_2024/TXBBPRECUT0p3_qsurf_0p995_mres.pkl"
 
 if INPUT_FORMAT == "nanotrees":
@@ -57,8 +57,11 @@ if INPUT_FORMAT == "nanotrees":
 
 # Pass and fail regions
 #txbb_bins = [0.75, 0.93, 1.0] #0.75 #0.93
-txbb_bins = [0.96, 1.0]
+# pass regions in TXbb bins, as the 2023 Zbb calibration (0.94-0.96, 0.96-0.98, 0.98-1.0)
+txbb_bins = [0.94, 0.96, 0.98, 1.0]
 min_txbb = txbb_bins[0]
+if INPUT_FORMAT == "nanotrees" and not USE_DDT:
+    tag += "_TXbb" + "_".join(str(b).replace(".", "p") for b in txbb_bins)
 # pT bins
 #pt_bins = [170, 250, 350, 400, 450, 500, 550, 600, 900, 10000]
 pt_bins = [350, 450, 550, 10000]

@@ -10,7 +10,7 @@ import correctionlib
 from collections import OrderedDict
 import uproot
 
-tag = "05Nov2026_Zto2Q_lepclean_v15_scouting_zbb" # 2023 + 2024 Zto2Q re-skim with bbFatJetLepClean #"5Nov2026_Scouting_zbb_2023_2024" (symlinks to zqq_2023_full (2023) and 02Nov2026_2024_v15_scouting_zbb (2024), Zto2Q only) #"5Nov2026_Scouting_zbb_2024" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
+tag = "06Nov2026_Zto2Q_jetvetocol_v15_scouting_zbb" # 2023 + 2024 Zto2Q and 2024 QCD HT 800-1500, jet veto saved as a column #"05Nov2026_Zto2Q_lepclean_v15_scouting_zbb" (2023 + 2024 Zto2Q re-skim with bbFatJetLepClean) #"5Nov2026_Scouting_zbb_2023_2024" (symlinks to zqq_2023_full (2023) and 02Nov2026_2024_v15_scouting_zbb (2024), Zto2Q only) #"5Nov2026_Scouting_zbb_2024" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
 
 # Pass and fail regions
 txbb_bins = [0.96, 1.0]
@@ -108,7 +108,11 @@ SAMPLES_DICT = {
     # "ttbar": ["TTto4Q", "TTtoLNu2Q", "TTto2L2Nu"],
     "Zto2Q": ["Zto2Q-4Jets"],
     # "Wto2Q": ["Wto2Q-3Jets"],
-}  # only Zto2Q in the 2023 + 2024 Zto2Q skims
+    # 2024 QCD HT 800-1500 (= NanoTrees qcd2 + qcd3), for the skimmer vs NanoTrees QCD cutflow comparison
+    "qcd": ["QCD-4Jets"],
+}  # only Zto2Q (2023 + 2024) and QCD (2024) in the 06Nov2026_Zto2Q_jetvetocol skims
+# years each sample is skimmed for (all YEARS if not listed)
+SAMPLE_YEARS = {"qcd": ["2024"]}
 MC_SAMPLES_LIST = [sample for sample in SAMPLES_DICT.keys() if sample != "data"]
 
 # Columns to load from the ntuples
@@ -184,6 +188,7 @@ WQQ_extra_columns = [("GenWPt", 1), ("GenWCS", 1), ("GenWUD", 1), ("bbFatJetVQQM
 extra_columns_dict = {
     "data": [],
     # "qcd": load_weight_shifts, # Don't bother loading QCD, just a waste of time since it is estimted from data anyway
+    "qcd": load_columns_pt_var + load_weight_shifts,  # the QCD skims have no JMS/JMR mass columns
     "ttbar": MC_common_extra_columns,
     # "hbb": MC_common_extra_columns, # Don't have hbb samples
     "Zto2Q": MC_common_extra_columns + ZQQ_extra_columns,
@@ -246,6 +251,8 @@ else:
 
             # Process each sample for this era
             for sample, sample_list in SAMPLES_DICT.items():
+                if year not in SAMPLE_YEARS.get(sample, [year]):
+                    continue
                 print(f"Loading {sample} for {year}...")
 
                 columns = base_columns + extra_columns_dict.get(sample, [])

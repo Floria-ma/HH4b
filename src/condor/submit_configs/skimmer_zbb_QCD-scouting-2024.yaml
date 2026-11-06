@@ -1,0 +1,15 @@
+{
+    # 2024 QCD for the skimmer vs NanoTrees QCD cutflow comparison: HT 800-1500, i.e. exactly the NanoTrees qcd2
+    # (HT-800to1000 + HT-1000to1200) and qcd3 (HT-1200to1500) trees
+    "2024": {
+        "QCD": {
+            "subsamples": [
+                "QCD-4Jets_Bin-HT-800to1000",
+                "QCD-4Jets_Bin-HT-1000to1200",
+                "QCD-4Jets_Bin-HT-1200to1500"
+            ],
+            "files_per_job": 5,
+            "chunksize": 8000
+        },
+    },
+}
