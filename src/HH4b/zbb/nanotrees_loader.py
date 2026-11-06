@@ -73,7 +73,7 @@ DEFAULT_SELECTION = {
     "sort_by": "txbb",
     "pt_lead": 300,  # highest-TXbb jet
     "txbb_lead": 0.3,  # highest-TXbb jet
-    "pt_subl": 0,  # both jets
+    "pt_subl": 200,  # both jets
     "dphi": 2.2,  # NanoTrees already require > 2.2
     "ht": 0,  # NanoTrees ht sums all scouting AK4 jets, the skimmer only the good_ak4jets
     "met": None,  # needs the met branch, which the skims of skim_nanotrees.py do not keep

@@ -10,7 +10,7 @@ import correctionlib
 from collections import OrderedDict
 import uproot
 
-tag = "5Nov2026_Scouting_zbb_2023_2024" # symlinks to zqq_2023_full (2023) and 02Nov2026_2024_v15_scouting_zbb (2024), Zto2Q only #"5Nov2026_Scouting_zbb_2024" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
+tag = "05Nov2026_Zto2Q_lepclean_v15_scouting_zbb" # 2023 + 2024 Zto2Q re-skim with bbFatJetLepClean #"5Nov2026_Scouting_zbb_2023_2024" (symlinks to zqq_2023_full (2023) and 02Nov2026_2024_v15_scouting_zbb (2024), Zto2Q only) #"5Nov2026_Scouting_zbb_2024" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
 
 # Pass and fail regions
 txbb_bins = [0.96, 1.0]
@@ -27,9 +27,16 @@ PRODUCER_MASS_RANGE = (20, 250)
 # lepton-jet cleaning of the VH NanoTrees producer on both bbFatJets (bbFatJetLepClean of bbbbSkimmer: no lepton with
 # pT > 20 within dR < 0.8). Needs skims with that column (and REPROCESS = True for the event caches made before it)
 PRODUCER_LEP_CLEANING: bool = True
+# AK4 jet veto map, the first cut of every region (the ak4_jetveto column of bbbbSkimmer: the zbb skims made after
+# 6Nov2026 save it instead of cutting on it). False for skims without the column (which already have the veto applied)
+APPLY_JETVETO: bool = True
+JETVETO_CUT = {"ak4_jetveto": [0.5, 1.5]} if APPLY_JETVETO else {}
 
 # Mass bins
-m_low, m_high = 40, 180
+# probe-jet mass of the regions and templates: "bbFatJetScoutParTmassCorrectedX2p" (m_X2p, 40-180) or
+# "bbFatJetScoutParTmassCorrResonance" (m_res, 30-200, as the NanoTrees templates)
+MASS_VAR = "bbFatJetScoutParTmassCorrResonance"
+m_low, m_high = (30, 200) if MASS_VAR == "bbFatJetScoutParTmassCorrResonance" else (40, 180)
 bin_width = 5
 n_mass_bins = int((m_high - m_low) / bin_width)
 
@@ -154,6 +161,8 @@ if DO_JMSR:
 base_columns = [(var, 2) for var in fatjet_vars] + [("weight", 1)]
 if PRODUCER_LEP_CLEANING:
     base_columns += [("bbFatJetLepClean", 2)]
+if APPLY_JETVETO:
+    base_columns += [("ak4_jetveto", 1)]
 
 load_columns_pt_var = []
 for pt_var in pt_variations:
@@ -505,6 +514,8 @@ for year in YEARS_COMBINED_DICT:
         out_dir = out_dir / f"producerMass{PRODUCER_MASS_RANGE[0]}to{PRODUCER_MASS_RANGE[1]}"
     if PRODUCER_LEP_CLEANING:
         out_dir = Path(f"{out_dir}_lepClean") if PRODUCER_MASS_RANGE is not None else out_dir / "lepClean"
+    if MASS_VAR == "bbFatJetScoutParTmassCorrResonance":
+        out_dir = out_dir / f"mres{m_low}to{m_high}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     template_dir = out_dir
@@ -530,7 +541,7 @@ for year in YEARS_COMBINED_DICT:
                 print(sample_name)
                 apply_jmsr_smearing_in_templates(
                         df,
-                        mass_branch_base= "bbFatJetScoutParTmassCorrectedX2p", #"bbFatJetParT3massCorrectedX2p",
+                        mass_branch_base=MASS_VAR, #"bbFatJetParT3massCorrectedX2p",
                         jet_index=0,
                         seed=42,
                         jms_vals=(0.9, 1.0, 1.1), # these are in nonsensical order right now, change to work with dict
@@ -540,22 +551,22 @@ for year in YEARS_COMBINED_DICT:
         # Determine the pt and mass variations
         for jshift in jshift_keys:
             pt_branch = "bbFatJetPt0"
-            mass_branch = "bbFatJetScoutParTmassCorrectedX2p0"
+            mass_branch = f"{MASS_VAR}0"
             #mass_branch = "bbFatJetScoutParTmassGeneric0"
             #mass_branch = "bbFatJetMsd0"
             if jshift == "":
                 pt_branch = "bbFatJetPt0"
-                mass_branch = "bbFatJetScoutParTmassCorrectedX2p0"
+                mass_branch = f"{MASS_VAR}0"
                 # mass_branch = "bbFatJetScoutParTmassGeneric0"
                 #mass_branch = "bbFatJetMsd0"
             elif jshift.startswith("JES") or jshift.startswith("JER"):
                 pt_branch = f"bbFatJetPt_{jshift}0"
-                mass_branch = "bbFatJetScoutParTmassCorrectedX2p0"
+                mass_branch = f"{MASS_VAR}0"
                 # mass_branch = "bbFatJetScoutParTmassGeneric0"
                 #mass_branch = "bbFatJetMsd0"
             elif jshift.startswith("JMS") or jshift.startswith("JMR"):
                 pt_branch = "bbFatJetPt0"
-                mass_branch = f"bbFatJetScoutParTmassCorrectedX2p_{jshift}0"
+                mass_branch = f"{MASS_VAR}_{jshift}0"
                 # mass_branch = f"bbFatJetScoutParTmassGeneric_{jshift}0"
                 #mass_branch = f"bbFatJetMsd_{jshift}0"
             # producer mass window on both jets, OR of msd and m_res ("a+b" cuts of utils.make_selection)
@@ -592,6 +603,7 @@ for year in YEARS_COMBINED_DICT:
                 # Create a region
                 selection_regions[region_key] = postprocessing.Region(
                     cuts={
+                        **JETVETO_CUT,
                         pt_branch: [pt_low, pt_high],
                         mass_branch: [m_low, m_high],
                         f"{tagger_branch}0": [txbb_low, txbb_high],
@@ -602,6 +614,7 @@ for year in YEARS_COMBINED_DICT:
 
             selection_regions["fail"] = postprocessing.Region(
                 cuts={
+                    **JETVETO_CUT,
                     pt_branch: [pt_low, pt_high],
                     mass_branch: [m_low, m_high],
                     **producer_mass_cuts,
@@ -613,7 +626,7 @@ for year in YEARS_COMBINED_DICT:
 
             fit_shape_var = postprocessing.ShapeVar(
                 mass_branch,
-                r"$m_\mathrm{X2p}$ (GeV)",
+                r"$m_\mathrm{res}$ (GeV)" if MASS_VAR == "bbFatJetScoutParTmassCorrResonance" else r"$m_\mathrm{X2p}$ (GeV)",
                 [n_mass_bins, m_low, m_high],
                 reg=True,
             )

@@ -1550,10 +1550,13 @@ class bbbbSkimmer(SkimmerABC):
         if apply_met_filters:
             add_selection("met_filters", cut_metfilters, *selection_args)
 
-        # jet veto maps
+        # jet veto maps. zbb: not cut on, saved as the ak4_jetveto column (True: no AK4 jet in the veto map) so that
+        # the templates can apply it as a cutflow step (the VH NanoTrees producer has no jet veto)
+        cut_jetveto = None
         if is_run3 and (self._region not in ("zbb-Zto2Q-DYLL", "zbb-DYLL-data")):
             cut_jetveto = get_jetveto_event(jets, year)
-            add_selection("ak4_jetveto_map", cut_jetveto, *selection_args)
+            if self._region != "zbb":
+                add_selection("ak4_jetveto_map", cut_jetveto, *selection_args)
 
             # cut_fatjetveto = get_jetveto_event(fatjets, year)
             # add_selection("ak8_jetveto_map", cut_fatjetveto, *selection_args)
@@ -1874,6 +1877,8 @@ class bbbbSkimmer(SkimmerABC):
             (ak.sum(veto_muon_sel, axis=1) == 0) &
             (ak.sum(veto_electron_sel, axis=1) == 0)
         ))
+        if self._region == "zbb" and cut_jetveto is not None:
+            skimmed_events["ak4_jetveto"] = ak.to_numpy(cut_jetveto)
 
         sel_all = selection.all(*selection.names)
         skimmed_events = {
