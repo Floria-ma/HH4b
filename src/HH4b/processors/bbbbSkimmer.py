@@ -1714,7 +1714,7 @@ class bbbbSkimmer(SkimmerABC):
                 del cut_pt_lead
 
                 cut_txbb_lead = (
-                    (bbFatJetVars["bbFatJetScoutParTTXbb"][:, 0] >= 0) 
+                    (bbFatJetVars["bbFatJetScoutParTTXbb"][:, 0] >= 0.3) 
                 )
                 add_selection("ak8_TXbb_lead", cut_txbb_lead, *selection_args)
                 del cut_txbb_lead
