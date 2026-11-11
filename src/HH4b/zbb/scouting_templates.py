@@ -5,15 +5,19 @@ from pathlib import Path
 
 from HH4b import utils
 from HH4b import postprocessing
+from HH4b.hh_vars import LUMI
 import itertools
 import correctionlib
 from collections import OrderedDict
 import uproot
+import os
+import shutil
+import tempfile
 
-tag = "06Nov2026_Zto2Q_jetvetocol_v15_scouting_zbb" # 2023 + 2024 Zto2Q and 2024 QCD HT 800-1500, jet veto saved as a column #"05Nov2026_Zto2Q_lepclean_v15_scouting_zbb" (2023 + 2024 Zto2Q re-skim with bbFatJetLepClean) #"5Nov2026_Scouting_zbb_2023_2024" (symlinks to zqq_2023_full (2023) and 02Nov2026_2024_v15_scouting_zbb (2024), Zto2Q only) #"5Nov2026_Scouting_zbb_2024" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
+tag = "02Nov2026_2024_v15_scouting_zbb" # 2024 Zto2Q, original selection (jet veto applied); data from DATA_TAG #"06Nov2026_Zto2Q_jetvetocol_v15_scouting_zbb" # 2023 + 2024 Zto2Q and 2024 QCD HT 800-1500, jet veto saved as a column #"05Nov2026_Zto2Q_lepclean_v15_scouting_zbb" (2023 + 2024 Zto2Q re-skim with bbFatJetLepClean) #"5Nov2026_Scouting_zbb_2023_2024" (symlinks to zqq_2023_full (2023) and 02Nov2026_2024_v15_scouting_zbb (2024), Zto2Q only) #"5Nov2026_Scouting_zbb_2024" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
 
 # Pass and fail regions
-txbb_bins = [0.96, 1.0]
+txbb_bins = [0.75, 0.93, 1.0]
 min_txbb = txbb_bins[0]
 # pT bins
 pt_bins = [350, 450, 550, 1800]
@@ -23,26 +27,32 @@ pt_bins = list(zip(pt_bins[:-1], pt_bins[1:]))
 
 # Mass window of the VH NanoTrees producer (vhTreeProducer mass_range), emulated on both bbFatJets: a jet passes
 # if its msd or its m_res is in [low, high). None: off
-PRODUCER_MASS_RANGE = (20, 250)
+PRODUCER_MASS_RANGE = None
 # lepton-jet cleaning of the VH NanoTrees producer on both bbFatJets (bbFatJetLepClean of bbbbSkimmer: no lepton with
 # pT > 20 within dR < 0.8). Needs skims with that column (and REPROCESS = True for the event caches made before it)
-PRODUCER_LEP_CLEANING: bool = True
+PRODUCER_LEP_CLEANING: bool = False
 # AK4 jet veto map, the first cut of every region (the ak4_jetveto column of bbbbSkimmer: the zbb skims made after
 # 6Nov2026 save it instead of cutting on it). False for skims without the column (which already have the veto applied)
-APPLY_JETVETO: bool = True
+APPLY_JETVETO: bool = False
 JETVETO_CUT = {"ak4_jetveto": [0.5, 1.5]} if APPLY_JETVETO else {}
 
 # Mass bins
 # probe-jet mass of the regions and templates: "bbFatJetScoutParTmassCorrectedX2p" (m_X2p, 40-180) or
 # "bbFatJetScoutParTmassCorrResonance" (m_res, 30-200, as the NanoTrees templates)
-MASS_VAR = "bbFatJetScoutParTmassCorrResonance"
-m_low, m_high = (30, 200) if MASS_VAR == "bbFatJetScoutParTmassCorrResonance" else (40, 180)
+MASS_VAR = "bbFatJetScoutParTmassCorrectedX2p"
+m_low, m_high = (30, 200) if MASS_VAR == "bbFatJetScoutParTmassCorrResonance" else (45, 180)
 bin_width = 5
 n_mass_bins = int((m_high - m_low) / bin_width)
 
 STORAGE_PROJ_DIR = Path("/eos/user/z/zima/bbbb/")
 DATA_DIR = STORAGE_PROJ_DIR / f"skimmer/{tag}"
-PROCESSED_DIR = STORAGE_PROJ_DIR / f"scouting/templates/{tag}"
+# data from a separate skim (same skimmer): the full Run2024C and Run2024E
+DATA_TAG = "06Nov2026_2024data_v15_scouting_zbb"
+SAMPLE_DATA_DIR = {  # skim dir per sample (default DATA_DIR)
+    "data": STORAGE_PROJ_DIR / f"skimmer/{DATA_TAG}",
+    "QCD": STORAGE_PROJ_DIR / "skimmer/10Nov2026_2024QCD_v15_scouting_zbb",  # all 2024 QCD-4Jets HT bins
+}
+PROCESSED_DIR = STORAGE_PROJ_DIR / f"scouting/templates/{DATA_TAG}_QCDMC"
 # PROCESSED_DIR = Path("processed")
 PROCESSED_DIR.mkdir(exist_ok=True, parents=True)
 
@@ -55,9 +65,9 @@ tagger_branch = "bbFatJetScoutParTTXbb"
 
 
 YEARS = [
-    # "2022", 
-    # "2022EE", 
-     "2023",
+    # "2022",
+    # "2022EE",
+    #  "2023",
     # "2023BPix",  # no 2023BPix Zto2Q skim
     "2024"
     ]
@@ -70,9 +80,12 @@ YEARS_COMBINED_DICT = {
     #          "2023",
     #         "2023BPix"
     #          ],
-    "2023": ["2023"],
+    # "2023": ["2023"],
     "2024": ["2024"]
 }
+# MC normalised to the lumi of the data runs used (None: full year). Applied to all the MC weights after loading,
+# so that the templates (and the MC subtraction of qcd_estimation.py) are at the data lumi
+MC_LUMI_SCALE = (LUMI["2024C"] + LUMI["2024E"]) / LUMI["2024"]
 RUNS = {
     "2023": ["Run2023C"],
     "2023BPix": ["Run2023D"],
@@ -88,6 +101,7 @@ RUNS = {
 }
 
 SAMPLES_DICT = {
+    "data": ["Run2024C", "Run2024E"],  # from DATA_TAG
     # "data": [
     #     #2023
     #     "Run2023C", 
@@ -109,10 +123,12 @@ SAMPLES_DICT = {
     "Zto2Q": ["Zto2Q-4Jets"],
     # "Wto2Q": ["Wto2Q-3Jets"],
     # 2024 QCD HT 800-1500 (= NanoTrees qcd2 + qcd3), for the skimmer vs NanoTrees QCD cutflow comparison
-    "qcd": ["QCD-4Jets"],
-}  # only Zto2Q (2023 + 2024) and QCD (2024) in the 06Nov2026_Zto2Q_jetvetocol skims
+    # "qcd": ["QCD-4Jets"],
+    # MC QCD ("QCD"; "qcd" is the data-driven estimate of qcd_estimation.py), scaled by MC_LUMI_SCALE as the other MC
+    "QCD": ["QCD-4Jets"],
+}
 # years each sample is skimmed for (all YEARS if not listed)
-SAMPLE_YEARS = {"qcd": ["2024"]}
+SAMPLE_YEARS = {"qcd": ["2024"], "QCD": ["2024"]}
 MC_SAMPLES_LIST = [sample for sample in SAMPLES_DICT.keys() if sample != "data"]
 
 # Columns to load from the ntuples
@@ -189,6 +205,7 @@ extra_columns_dict = {
     "data": [],
     # "qcd": load_weight_shifts, # Don't bother loading QCD, just a waste of time since it is estimted from data anyway
     "qcd": load_columns_pt_var + load_weight_shifts,  # the QCD skims have no JMS/JMR mass columns
+    "QCD": load_columns_pt_var + load_weight_shifts,
     "ttbar": MC_common_extra_columns,
     # "hbb": MC_common_extra_columns, # Don't have hbb samples
     "Zto2Q": MC_common_extra_columns + ZQQ_extra_columns,
@@ -258,7 +275,7 @@ else:
                 columns = base_columns + extra_columns_dict.get(sample, [])
                 dataframes = {
                     **utils.load_samples(
-                        data_dir=str(DATA_DIR),
+                        data_dir=str(SAMPLE_DATA_DIR.get(sample, DATA_DIR)),
                         samples={sample: sample_list},
                         year=year,
                         columns=utils.format_columns(columns),
@@ -384,6 +401,18 @@ if APPLY_Z_RECOIL_CORR:
 
     print("Zto2Q corrections applied")
 
+if MC_LUMI_SCALE is not None:
+    print(f"MC weights scaled by {MC_LUMI_SCALE:.4f} (processed data lumi / full year lumi)")
+    for year in YEARS_COMBINED_DICT.keys():
+        for sample, df in events_combined[year].items():
+            if sample == "data":
+                continue
+            wcols = [
+                c for c in df.columns
+                if (c[0] if isinstance(c, tuple) else c).startswith(("weight", "finalWeight", "pdf_weights", "scale_weights"))
+            ]
+            df[wcols] = df[wcols] * MC_LUMI_SCALE
+
 # further split Zto2Q and Wto2Q events into different categories
 for year in YEARS_COMBINED_DICT.keys():
     Zto2Q = events_combined[year]["Zto2Q"]
@@ -405,13 +434,18 @@ for year in YEARS_COMBINED_DICT.keys():
 MC_SAMPLES_FINAL_LIST = MC_SAMPLES_LIST + ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ"]
 
 def save_to_root(outfile: Path, templates: dict):
-    with uproot.recreate(str(outfile)) as f_out:
-        for category in templates.keys():
-            hist = templates[category]
-            categories, _ = hist.axes
-            for sample in list(categories):
-                h = templates[category][{"Sample": sample}]
-                f_out[f"{sample}_{category}"] = h
+    # written on local disk, then copied: uproot writing directly to EOS (FUSE) can corrupt the file
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpfile = Path(tmpdir) / Path(outfile).name
+        with uproot.recreate(str(tmpfile)) as f_out:
+            for category in templates.keys():
+                hist = templates[category]
+                categories, _ = hist.axes
+                for sample in list(categories):
+                    h = templates[category][{"Sample": sample}]
+                    f_out[f"{sample}_{category}"] = h
+        shutil.copyfile(tmpfile, f"{outfile}.tmp")
+        os.replace(f"{outfile}.tmp", outfile)
 
 def apply_jmsr_smearing_in_templates(
     df: pd.DataFrame,
@@ -463,7 +497,7 @@ def apply_jmsr_smearing_in_templates(
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Zto2Q_unmatched", "Wto2Q", "ttbar", "qcd"]
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar", "qcd"]
 # bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "Wto2Q", "ttbar"]
-bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ"]  # Zto2Q only
+bkg_keys = ["Zto2Q_BB", "Zto2Q_CC", "Zto2Q_QQ", "QCD"]  # Zto2Q and MC QCD
 sig_keys = []
 bg_order = list(reversed(bkg_keys))
 
@@ -523,6 +557,9 @@ for year in YEARS_COMBINED_DICT:
         out_dir = Path(f"{out_dir}_lepClean") if PRODUCER_MASS_RANGE is not None else out_dir / "lepClean"
     if MASS_VAR == "bbFatJetScoutParTmassCorrResonance":
         out_dir = out_dir / f"mres{m_low}to{m_high}"
+    # one directory per set of TXbb working points, e.g. TXbb0p75_0p93_1p0 (the event cache stays in PROCESSED_DIR)
+    txbb_edges = [txbb_bins[0][0]] + [high for _, high in txbb_bins]
+    out_dir = out_dir / ("TXbb" + "_".join(str(x).replace(".", "p") for x in txbb_edges))
     out_dir.mkdir(parents=True, exist_ok=True)
 
     template_dir = out_dir
@@ -543,17 +580,19 @@ for year in YEARS_COMBINED_DICT:
 
         events = events_combined[year]
 
-        for sample_name, df in events.items():
-            if sample_name != "data":
-                print(sample_name)
-                apply_jmsr_smearing_in_templates(
-                        df,
-                        mass_branch_base=MASS_VAR, #"bbFatJetParT3massCorrectedX2p",
-                        jet_index=0,
-                        seed=42,
-                        jms_vals=(0.9, 1.0, 1.1), # these are in nonsensical order right now, change to work with dict
-                        jmr_vals=(1.1, 1.0, 1.2)
-                    )
+        # no JMS/JMR smearing of the MC mass for now (as decorrelated_scouting_templates.py). Note: inside this pT loop
+        # it re-smeared the already smeared nominal mass once per pT bin
+        # for sample_name, df in events.items():
+        #     if sample_name != "data":
+        #         print(sample_name)
+        #         apply_jmsr_smearing_in_templates(
+        #                 df,
+        #                 mass_branch_base=MASS_VAR, #"bbFatJetParT3massCorrectedX2p",
+        #                 jet_index=0,
+        #                 seed=42,
+        #                 jms_vals=(0.9, 1.0, 1.1), # these are in nonsensical order right now, change to work with dict
+        #                 jmr_vals=(1.1, 1.0, 1.2)
+        #             )
 
         # Determine the pt and mass variations
         for jshift in jshift_keys:

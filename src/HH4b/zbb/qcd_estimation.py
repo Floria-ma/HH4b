@@ -2,9 +2,9 @@
 # QCD estimation of the scouting Zbb pass regions, adapted from the VHcc had channel one (Beatriz-PlotTools).
 # Inputs are the templates_{year}_{pT bin}.root of scouting_templates.py, with histograms {sample}_{region}.
 # Differences to the VHcc one: these templates have no low V mass control region, so the TF is fitted to the pass/fail
-# ratio of the same pT bin, with the H signal region blinded (the pass data of scouting_templates.py is zeroed there,
-# BLIND_WINDOW). The fail * TF estimate is normalised with one factor, so that it equals the pass outside the blinded
-# window: the VHcc normalisation (to the fail integral, then times epsilon) assumes a TF flat across the window.
+# ratio of the same pT bin, with the Z peak window (80-120 GeV) excluded from the fit. The fail * TF estimate is
+# normalised with one factor, so that it equals the pass outside the excluded window: the VHcc normalisation (to the
+# fail integral, then times epsilon) assumes a TF flat across the window.
 import ROOT
 import numpy as np
 import uproot
@@ -31,8 +31,8 @@ def subtract_non_qcd(hist, file, region):
             data_minus_MC.Add(h, -1)
     return data_minus_MC
 
-def blind_sigRegion(hist, low=0, high=0):
-    """blind Hbb region by default (100-150), as BLIND_WINDOW of scouting_templates.py"""
+def blind_sigRegion(hist, low=80, high=120):
+    """blind the Z peak window (80-120 GeV) by default"""
     newhist = hist.Clone(hist.GetName()+"_blind")
     for i in range(1, newhist.GetNbinsX() + 1):
         x_axis = newhist.GetBinCenter(i)
@@ -102,11 +102,9 @@ for cat_name, cat_cfg in categories.items():
     xmax = H_qcd_fail_hist.GetXaxis().GetXmax()
     nbins = H_qcd_fail_hist.GetNbinsX()
 
-    # blind Hbb signal region (100-150) for the TF fit and epsilon calculation
-   # H_goodV_pass_blind = blind_sigRegion(H_qcd_pass_hist)
-   # H_qcd_fail_blind = blind_sigRegion(H_qcd_fail_hist)
-    H_goodV_pass_blind = H_qcd_pass_hist
-    H_qcd_fail_blind = H_qcd_fail_hist
+    # exclude the Zbb window (80-120 GeV) from the TF fit and epsilon calculation
+    H_goodV_pass_blind = blind_sigRegion(H_qcd_pass_hist)
+    H_qcd_fail_blind = blind_sigRegion(H_qcd_fail_hist)
 
     # pass/fail ratio from the blinded histograms (blinded bins are empty and skipped by the fit)
     ratio = H_goodV_pass_blind.Clone(f"ratio_{flavor}_{cat_name}")
@@ -172,8 +170,6 @@ for cat_name, cat_cfg in categories.items():
     H_qcd_fail_scaled.SetDirectory(0)
     H_qcd_fail_scaled.Scale(eps)
 
-    # plot the pass data blinded: it is zeroed in the templates, so data - MC is negative there
-    H_qcd_pass_hist = H_goodV_pass_blind
 
     # canvas and legend
     can = ROOT.TCanvas(f"can_{flavor}_{cat_name}", "can", 1000, 750)
@@ -210,7 +206,7 @@ for cat_name, cat_cfg in categories.items():
     legend.Draw()
 
     H_qcd_pass_hist.SetTitle(f"QCD estimation {flavor} {cat_name}")
-    H_qcd_pass_hist.GetXaxis().SetTitle("m^{scoutGloParT}_{res} (GeV)")
+    H_qcd_pass_hist.GetXaxis().SetTitle("m^{scoutGloParT}_{X2p} (GeV)")
     H_qcd_pass_hist.GetYaxis().SetTitle(f"Events/{H_qcd_pass_hist.GetBinWidth(1):.2f} GeV")
     ROOT.gStyle.SetOptStat(0)
     can.Update()
