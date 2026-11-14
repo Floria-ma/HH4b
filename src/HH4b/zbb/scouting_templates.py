@@ -14,10 +14,11 @@ import os
 import shutil
 import tempfile
 
-tag = "02Nov2026_2024_v15_scouting_zbb" # 2024 Zto2Q, original selection (jet veto applied); data from DATA_TAG #"06Nov2026_Zto2Q_jetvetocol_v15_scouting_zbb" # 2023 + 2024 Zto2Q and 2024 QCD HT 800-1500, jet veto saved as a column #"05Nov2026_Zto2Q_lepclean_v15_scouting_zbb" (2023 + 2024 Zto2Q re-skim with bbFatJetLepClean) #"5Nov2026_Scouting_zbb_2023_2024" (symlinks to zqq_2023_full (2023) and 02Nov2026_2024_v15_scouting_zbb (2024), Zto2Q only) #"5Nov2026_Scouting_zbb_2024" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
+tag = "5Nov2026_Scouting_zbb_2023_2024" # 2023 Zto2Q (all HT bins, lead TXbb >= 0.3); #"02Nov2026_2024_v15_scouting_zbb" # 2024 Zto2Q, original selection (jet veto applied); data from DATA_TAG #"06Nov2026_Zto2Q_jetvetocol_v15_scouting_zbb" # 2023 + 2024 Zto2Q and 2024 QCD HT 800-1500, jet veto saved as a column #"05Nov2026_Zto2Q_lepclean_v15_scouting_zbb" (2023 + 2024 Zto2Q re-skim with bbFatJetLepClean) #"5Nov2026_Scouting_zbb_2023_2024" (symlinks to zqq_2023_full (2023) and 02Nov2026_2024_v15_scouting_zbb (2024), Zto2Q only) #"5Nov2026_Scouting_zbb_2024" #"12Feb2026_Scouting_Fixed_v15_scouting_zbb" #"07Feb2026_PTl300TXbb0p3_PTsl300_HT600_v15_scouting_zbb" #"11Dec2025_v15_scouting_zbb"
 
 # Pass and fail regions
-txbb_bins = [0.75, 0.93, 1.0]
+#txbb_bins = [0.75, 0.93, 1.0]
+txbb_bins = [0.94, 0.96,0.98, 1.0]
 min_txbb = txbb_bins[0]
 # pT bins
 pt_bins = [350, 450, 550, 1800]
@@ -47,10 +48,10 @@ n_mass_bins = int((m_high - m_low) / bin_width)
 STORAGE_PROJ_DIR = Path("/eos/user/z/zima/bbbb/")
 DATA_DIR = STORAGE_PROJ_DIR / f"skimmer/{tag}"
 # data from a separate skim (same skimmer): the full Run2024C and Run2024E
-DATA_TAG = "06Nov2026_2024data_v15_scouting_zbb"
+DATA_TAG = "11Nov2026_data_rawTXbb_v15_scouting_zbb"  # 2023 Run2023C, 328/1465 jobs done #"06Nov2026_2024data_v15_scouting_zbb"
 SAMPLE_DATA_DIR = {  # skim dir per sample (default DATA_DIR)
     "data": STORAGE_PROJ_DIR / f"skimmer/{DATA_TAG}",
-    "QCD": STORAGE_PROJ_DIR / "skimmer/10Nov2026_2024QCD_v15_scouting_zbb",  # all 2024 QCD-4Jets HT bins
+    "QCD": STORAGE_PROJ_DIR / "skimmer/12Nov2026_2023QCD_v15_scouting_zbb",  # 2023 QCD_PT bins #"skimmer/10Nov2026_2024QCD_v15_scouting_zbb" (all 2024 QCD-4Jets HT bins)
 }
 PROCESSED_DIR = STORAGE_PROJ_DIR / f"scouting/templates/{DATA_TAG}_QCDMC"
 # PROCESSED_DIR = Path("processed")
@@ -67,9 +68,9 @@ tagger_branch = "bbFatJetScoutParTTXbb"
 YEARS = [
     # "2022",
     # "2022EE",
-    #  "2023",
+     "2023",
     # "2023BPix",  # no 2023BPix Zto2Q skim
-    "2024"
+    # "2024"
     ]
 YEARS_COMBINED_DICT = {
     # "2022All": [
@@ -80,12 +81,14 @@ YEARS_COMBINED_DICT = {
     #          "2023",
     #         "2023BPix"
     #          ],
-    # "2023": ["2023"],
-    "2024": ["2024"]
+    "2023": ["2023"],
+    # "2024": ["2024"]
 }
 # MC normalised to the lumi of the data runs used (None: full year). Applied to all the MC weights after loading,
 # so that the templates (and the MC subtraction of qcd_estimation.py) are at the data lumi
-MC_LUMI_SCALE = (LUMI["2024C"] + LUMI["2024E"]) / LUMI["2024"]
+# 2023: fraction of the Run2023C events processed (328 of 1465 data jobs: 4279966094 of the 19400461740 events in DAS)
+MC_LUMI_SCALE = 4279966094 / 19400461740
+# MC_LUMI_SCALE = (LUMI["2024C"] + LUMI["2024E"]) / LUMI["2024"]
 RUNS = {
     "2023": ["Run2023C"],
     "2023BPix": ["Run2023D"],
@@ -101,7 +104,7 @@ RUNS = {
 }
 
 SAMPLES_DICT = {
-    "data": ["Run2024C", "Run2024E"],  # from DATA_TAG
+    "data": ["Run2023C"],  # from DATA_TAG #["Run2024C", "Run2024E"]
     # "data": [
     #     #2023
     #     "Run2023C", 
@@ -125,10 +128,10 @@ SAMPLES_DICT = {
     # 2024 QCD HT 800-1500 (= NanoTrees qcd2 + qcd3), for the skimmer vs NanoTrees QCD cutflow comparison
     # "qcd": ["QCD-4Jets"],
     # MC QCD ("QCD"; "qcd" is the data-driven estimate of qcd_estimation.py), scaled by MC_LUMI_SCALE as the other MC
-    "QCD": ["QCD-4Jets"],
+    "QCD": ["QCD_PT"],  # 2023 #["QCD-4Jets"] (2024)
 }
 # years each sample is skimmed for (all YEARS if not listed)
-SAMPLE_YEARS = {"qcd": ["2024"], "QCD": ["2024"]}
+SAMPLE_YEARS = {"qcd": ["2024"], "QCD": ["2023", "2024"]}
 MC_SAMPLES_LIST = [sample for sample in SAMPLES_DICT.keys() if sample != "data"]
 
 # Columns to load from the ntuples
