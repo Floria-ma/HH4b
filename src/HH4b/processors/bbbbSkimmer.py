@@ -183,7 +183,7 @@ class bbbbSkimmer(SkimmerABC):
     }
 
     zbb_fatjet_scouting_selection = {  
-        "pt": 200,
+        "pt": 170,
         "eta": 2.4, # TODO: Change to 2.2 from 2.4, source Patin
         "msd": 0,
         "mreg": 0, # this wont work, default mass var not correct in function that takes this dict
@@ -1708,7 +1708,7 @@ class bbbbSkimmer(SkimmerABC):
                 add_selection("num_ak8jets", eventVars["nFatJets"] >= 2, *selection_args)
 
                 cut_pt_lead = (
-                    (bbFatJetVars["bbFatJetPt"][:, 0] >= 300) # Delta R(bb) = 2m_H / p_T, so p_T ~ 312.5 would be boosted regime for Higgs
+                    (bbFatJetVars["bbFatJetPt"][:, 0] >= 170) # Delta R(bb) = 2m_H / p_T, so p_T ~ 312.5 would be boosted regime for Higgs
                 )
                 add_selection("ak8_pt_lead", cut_pt_lead, *selection_args)
                 del cut_pt_lead
@@ -1719,10 +1719,10 @@ class bbbbSkimmer(SkimmerABC):
                 add_selection("ak8_TXbb_lead", cut_txbb_lead, *selection_args)
                 del cut_txbb_lead
 
-                # FatJet1 with pT>200
+                # FatJet1 with pT>170
                 cut_pt_subl = (
                     np.sum(
-                        bbFatJetVars["bbFatJetPt"][:, :2] >= 200, 
+                        bbFatJetVars["bbFatJetPt"][:, :2] >= 170, 
                         axis=1,
                     )
                 ) >= 2  # >=2 because we already have the lead fatjet
@@ -1738,8 +1738,8 @@ class bbbbSkimmer(SkimmerABC):
                 )
                 add_selection("ak8_back2back", zbb_ak8jets_dphi >= (np.pi / 2), *selection_args)
 
-                # HT > 600 (Fully efficient region for scouting HT trigger)
-                add_selection("ht600", eventVars["ht"] >= 600, *selection_args) 
+                # HT > 400
+                add_selection("ht400", eventVars["ht"] >= 400, *selection_args)
 
                 # add_selection(
                 #     "0lep",
