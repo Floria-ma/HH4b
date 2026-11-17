@@ -1719,6 +1719,12 @@ class bbbbSkimmer(SkimmerABC):
                 add_selection("ak8_TXbb_lead", cut_txbb_lead, *selection_args)
                 del cut_txbb_lead
 
+                # leading (TXbb-ordered) AK8 jet ParT X2p mass in [40, 200), contains the 45-180 template window
+                mass_x2p_lead = bbFatJetVars["bbFatJetScoutParTmassCorrectedX2p"][:, 0]
+                cut_mass_lead = (mass_x2p_lead >= 40) & (mass_x2p_lead < 200)
+                add_selection("ak8_mass_lead", cut_mass_lead, *selection_args)
+                del mass_x2p_lead, cut_mass_lead
+
                 # FatJet1 with pT>170
                 cut_pt_subl = (
                     np.sum(
