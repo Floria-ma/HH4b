@@ -1947,7 +1947,8 @@ class bbbbSkimmer(SkimmerABC):
                     (scale_weights * weight_np[:, np.newaxis])[gen_selected], axis=0
                 )
 
-        if "HHTobbbb" in dataset or "HHto4B" in dataset or dataset.startswith(("Zto2Q", "Wto2Q")):
+        # PDF weights for Zto2Q/Wto2Q dropped: ~100 columns per event, not used by the Zbb templates, filled the EOS quota
+        if "HHTobbbb" in dataset or "HHto4B" in dataset:
             pdf_weights = get_pdf_weights(events)
             weights_dict["pdf_weights"] = pdf_weights * weights_dict["weight"][:, np.newaxis]
             totals_dict["np_pdf_weights"] = np.sum(
